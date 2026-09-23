@@ -1,0 +1,15 @@
+# Node / Wrangler
+node_modules/
+.wrangler/
+dist/
+
+# OS / Editor
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/
+
+# Ensure WASM binary is committed for Cloudflare Pages direct deployment
+!public/vpn2qr.wasm
+!public/wasm_exec.js

@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>vpn2qr - 纯前端零知识 VPS 节点一键搭建工具</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- QRCode.js (纯客户端矢量二维码渲染，零外部 API 依赖) -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <!-- Go WebAssembly 运行时桥接 -->
+  <script src="wasm_exec.js"></script>
+  <style>
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    .animate-pulse-subtle {
+      animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
+
+  <!-- 顶部导航与隐私徽章 -->
+  <header class="w-full bg-white border-b border-slate-200 py-4 px-6 sticky top-0 z-30 shadow-xs">
+    <div class="max-w-4xl mx-auto flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-black text-lg shadow-sm">
+          ⚡
+        </div>
+        <div>
+          <h1 class="font-bold text-slate-900 text-base sm:text-lg leading-tight">vpn2qr Web</h1>
+          <p class="text-xs text-slate-500">免 SSH 工具 · 一键搭建 VLESS-Reality 节点</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-2">
+        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <svg class="w-3 h-3 mr-1 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zM11 14a1 1 0 11-2 0 1 1 0 012 0zm0-7a1 1 0 10-2 0v3a1 1 0 102 0V7z" clip-rule="evenodd" />
+          </svg>
+          零知识端侧加解密
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主体容器 -->
+  <main class="max-w-2xl w-full mx-auto p-4 sm:p-6 my-auto">
+
+    <!-- 安全声明横幅 -->
+    <div class="mb-6 p-3.5 bg-blue-50/70 border border-blue-200/60 rounded-2xl flex items-start space-x-3 text-xs text-blue-900 leading-relaxed">
+      <span class="text-base leading-none">🛡️</span>
+      <div>
+        <span class="font-semibold">绝对隐私保障：</span>
+        本工具采用浏览器端 WebAssembly (WASM) 运行原生 SSH 加密通道，Cloudflare 仅作为底层盲中继传输密文。
+        您的 VPS IP、密码或私钥<strong class="font-semibold text-blue-950 underline decoration-blue-400">绝不会上传到任何后端数据库或第三方服务器</strong>，页面刷新即销毁。
+      </div>
+    </div>
+
+    <!-- 表单卡片 -->
+    <div id="card-form" class="bg-white rounded-3xl p-6 sm:p-8 shadow-xl shadow-slate-200/50 border border-slate-200 transition-all duration-300">
+      <div class="mb-6">
+        <h2 class="text-xl font-bold text-slate-900">配置服务器信息</h2>
+        <p class="text-xs text-slate-500 mt-1">请输入您购买的 VPS 远程连接凭证（通常在 VPS 后台或开通邮件中）</p>
+      </div>
+
+      <form id="deploy-form" onsubmit="event.preventDefault(); handleDeploy();" class="space-y-4">
+        <!-- VPS IP 与端口 -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-semibold text-slate-700 mb-1.5">VPS 公网 IP 地址 <span class="text-rose-500">*</span></label>
+            <input id="vps-host" type="text" required placeholder="例如：198.51.100.23" 
+                   class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1.5">SSH 端口</label>
+            <input id="vps-port" type="number" value="22" required min="1" max="65535" 
+                   class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition">
+          </div>
+        </div>
+
+        <!-- 用户名 -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1.5">用户名</label>
+          <input id="vps-user" type="text" value="root" required 
+                 class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition">
+        </div>
+
+        <!-- 认证模式切换 -->
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="text-xs font-semibold text-slate-700">认证凭证 <span class="text-rose-500">*</span></label>
+            <div class="flex text-xs space-x-2">
+              <button type="button" id="tab-pwd" onclick="switchAuthMode('password')" class="font-semibold text-indigo-600 border-b-2 border-indigo-600 pb-0.5">密码登录</button>
+              <button type="button" id="tab-key" onclick="switchAuthMode('key')" class="text-slate-400 hover:text-slate-600 pb-0.5">SSH 私钥</button>
+            </div>
+          </div>
+          
+          <!-- 密码输入框 -->
+          <div id="auth-pwd-container" class="relative">
+            <input id="vps-password" type="password" placeholder="输入 root 用户密码" 
+                   class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition pr-10">
+            <button type="button" onclick="togglePasswordVisibility()" class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 text-xs">
+              <span id="eye-icon">👁️</span>
+            </button>
+          </div>
+
+          <!-- 私钥输入框 (默认隐藏) -->
+          <div id="auth-key-container" class="hidden">
+            <textarea id="vps-key" rows="4" placeholder="粘贴私钥文本 (-----BEGIN OPENSSH PRIVATE KEY----- ...)" 
+                      class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"></textarea>
+          </div>
+        </div>
+
+        <!-- 高级设置 (折叠抽屉) -->
+        <div class="border-t border-slate-100 pt-3">
+          <button type="button" onclick="toggleAdvancedSettings()" class="flex items-center justify-between w-full text-xs text-slate-500 hover:text-slate-800 transition py-1">
+            <span class="font-medium">🛠️ 高级网络设置 (小白保持默认即可)</span>
+            <span id="adv-arrow" class="transform transition-transform text-[10px]">▼</span>
+          </button>
+          
+          <div id="advanced-container" class="hidden mt-3 space-y-3 p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[11px] font-medium text-slate-600 mb-1">节点伪装域名 (SNI)</label>
+                <input id="adv-sni" type="text" value="gateway.icloud.com" 
+                       class="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-indigo-500">
+              </div>
+              <div>
+                <label class="block text-[11px] font-medium text-slate-600 mb-1">Reality 端口</label>
+                <input id="adv-nodeport" type="number" value="443" min="1" max="65535" 
+                       class="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-indigo-500">
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[11px] font-medium text-slate-600 mb-1">节点名称</label>
+                <input id="adv-nodename" type="text" value="VPS-Reality" 
+                       class="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-indigo-500">
+              </div>
+              <div>
+                <label class="block text-[11px] font-medium text-slate-600 mb-1">Cloudflare 中继 Worker 域名</label>
+                <input id="adv-worker" type="text" placeholder="留空则使用当前站点 /ws" 
+                       class="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-indigo-500">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 提交按钮 -->
+        <button id="btn-submit" type="submit" 
+                class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-semibold rounded-2xl transition duration-200 shadow-lg shadow-indigo-600/25 flex items-center justify-center space-x-2">
+          <span>🚀 一键搭建节点并生成二维码</span>
+        </button>
+      </form>
+    </div>
+
+    <!-- 运行状态与进度卡片 (部署中展示) -->
+    <div id="card-progress" class="hidden bg-white rounded-3xl p-6 sm:p-8 shadow-xl shadow-slate-200/50 border border-slate-200 space-y-6">
+      <div class="text-center space-y-2">
+        <div class="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 text-2xl animate-bounce">
+          ⚙️
+        </div>
+        <h3 id="progress-title" class="text-lg font-bold text-slate-900">正在初始化安全隧道...</h3>
+        <p id="progress-desc" class="text-xs text-slate-500">整个过程大约需要 40 ~ 90 秒，请勿关闭或刷新此页面</p>
+      </div>
+
+      <!-- 阶段步骤指示条 -->
+      <div class="space-y-3 max-w-md mx-auto py-2">
+        <div class="flex items-center space-x-3 text-xs" id="step-1">
+          <div class="step-icon w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold">1</div>
+          <span class="font-medium text-slate-700">建立端到端加密 SSH 通道</span>
+        </div>
+        <div class="flex items-center space-x-3 text-xs" id="step-2">
+          <div class="step-icon w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-bold">2</div>
+          <span class="font-medium text-slate-400">安装 Linux 依赖与 Xray 核心</span>
+        </div>
+        <div class="flex items-center space-x-3 text-xs" id="step-3">
+          <div class="step-icon w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-bold">3</div>
+          <span class="font-medium text-slate-400">配置 Reality 密钥与安全流控</span>
+        </div>
+        <div class="flex items-center space-x-3 text-xs" id="step-4">
+          <div class="step-icon w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-bold">4</div>
+          <span class="font-medium text-slate-400">放行防火墙并提取节点二维码</span>
+        </div>
+      </div>
+
+      <!-- 实时终端日志抽屉 -->
+      <div class="border border-slate-200 rounded-2xl overflow-hidden bg-slate-950">
+        <div class="px-4 py-2 bg-slate-900 flex items-center justify-between text-xs text-slate-400">
+          <div class="flex items-center space-x-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+            <span class="ml-2 font-mono text-[11px] text-slate-300">live-terminal.log</span>
+          </div>
+          <button type="button" onclick="clearLogs()" class="hover:text-slate-200 text-[10px]">清屏</button>
+        </div>
+        <div id="terminal-logs" class="h-44 p-3.5 overflow-y-auto font-mono text-xs text-emerald-400 space-y-1 select-text">
+          <div class="text-slate-500">准备启动端侧 WebAssembly 执行环境...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 智能诊断与一键重连卡片 (遇到问题时展示) -->
+    <div id="card-diagnostic" class="hidden bg-white rounded-3xl p-6 sm:p-8 shadow-xl shadow-slate-200/50 border border-amber-200 space-y-6">
+      <div class="flex items-start space-x-4">
+        <div class="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 text-2xl shrink-0">
+          🔍
+        </div>
+        <div>
+          <h3 class="text-lg font-bold text-slate-900">智能诊断与连接排查</h3>
+          <p class="text-xs text-slate-500 mt-0.5">检测到自动化部署过程中断，系统已自动定位可能原因</p>
+        </div>
+      </div>
+
+      <!-- 诊断结果明细条目 -->
+      <div class="space-y-2.5 bg-slate-50 p-4 rounded-2xl border border-slate-200/70 text-xs">
+        <div class="flex items-center justify-between py-1 border-b border-slate-200/60">
+          <span class="text-slate-600">Cloudflare 盲中继通路</span>
+          <span id="diag-relay" class="font-medium text-emerald-600 flex items-center">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></span> 正常畅通
+          </span>
+        </div>
+        <div class="flex items-center justify-between py-1 border-b border-slate-200/60">
+          <span class="text-slate-600">VPS IP 与 22 端口连通性</span>
+          <span id="diag-port" class="font-medium text-slate-700 flex items-center">
+            <span class="w-2 h-2 rounded-full bg-slate-300 mr-1.5"></span> 待检测
+          </span>
+        </div>
+        <div class="flex items-center justify-between py-1 border-b border-slate-200/60">
+          <span class="text-slate-600">SSH 身份凭证核验</span>
+          <span id="diag-auth" class="font-medium text-slate-700 flex items-center">
+            <span class="w-2 h-2 rounded-full bg-slate-300 mr-1.5"></span> 待检测
+          </span>
+        </div>
+        <div class="flex items-center justify-between py-1">
+          <span class="text-slate-600">异常摘要</span>
+          <span id="diag-reason" class="font-medium text-rose-600 truncate max-w-[220px]">未知异常</span>
+        </div>
+      </div>
+
+      <!-- 针对性解决建议 -->
+      <div class="p-3.5 bg-amber-50/70 border border-amber-200/60 rounded-2xl text-xs text-amber-900 space-y-1">
+        <div class="font-semibold flex items-center space-x-1">
+          <span>💡</span>
+          <span>排查与优化建议：</span>
+        </div>
+        <div id="diag-advice" class="leading-relaxed pl-5 text-amber-800">
+          正在生成排查建议...
+        </div>
+      </div>
+
+      <!-- 操作按钮群 -->
+      <div class="space-y-2 pt-2">
+        <button onclick="retryDeploy(false)" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-2xl transition duration-200 shadow-md shadow-indigo-100 flex items-center justify-center space-x-2 text-xs">
+          <span>🔄 一键重新连接 (保持现有参数，重新搭建)</span>
+        </button>
+
+        <button onclick="retryDeploy(true)" class="w-full py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-semibold rounded-2xl transition duration-200 flex items-center justify-center space-x-2 text-xs">
+          <span>⚡ 快速取回已有节点 (免重装模式，1~2 秒即可返回)</span>
+        </button>
+
+        <button onclick="returnToForm()" class="w-full py-2 text-slate-500 hover:text-slate-800 text-xs transition">
+          ✏️ 返回修改 IP 或密码
+        </button>
+      </div>
+    </div>
+
+    <!-- 成功结果卡片 (完成后展示) -->
+    <div id="card-result" class="hidden bg-white rounded-3xl p-6 sm:p-8 shadow-xl shadow-slate-200/50 border border-slate-200 space-y-6 text-center">
+      <div class="inline-flex p-3 rounded-2xl bg-emerald-50 text-emerald-600 text-3xl mb-1">
+        🎉
+      </div>
+      <div>
+        <h3 class="text-xl font-bold text-slate-900">节点已成功搭建！</h3>
+        <p class="text-xs text-slate-500 mt-1">请使用手机代理软件扫描下方二维码即可自动添加</p>
+      </div>
+
+      <!-- 二维码容器 -->
+      <div class="flex flex-col items-center justify-center p-6 bg-slate-50 rounded-2xl border border-slate-100 shadow-inner">
+        <div id="qrcode-box" class="p-3 bg-white rounded-2xl shadow-sm border border-slate-200"></div>
+        <button onclick="downloadQRCode()" class="mt-4 inline-flex items-center space-x-1.5 text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+          <span>💾 保存二维码图片到本地</span>
+        </button>
+      </div>
+
+      <!-- 节点链接与一键复制 -->
+      <div class="space-y-2 text-left">
+        <label class="block text-xs font-semibold text-slate-700">节点链接 (VLESS URI)</label>
+        <div class="flex items-center space-x-2">
+          <input id="vless-link" readonly type="text" class="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-600 select-all outline-none">
+          <button onclick="copyVlessLink()" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition shrink-0">
+            📋 复制链接
+          </button>
+        </div>
+      </div>
+
+      <!-- 客户端使用指南 -->
+      <div class="pt-4 border-t border-slate-100 text-left">
+        <h4 class="text-xs font-bold text-slate-700 mb-2">📱 支持扫码导入的客户端：</h4>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-slate-600">
+          <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+            <span class="font-bold block text-slate-800">iOS</span>
+            Shadowrocket (小火箭)<br>OneXray
+          </div>
+          <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+            <span class="font-bold block text-slate-800">Android</span>
+            v2rayNG<br>Clash Meta
+          </div>
+          <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+            <span class="font-bold block text-slate-800">Windows</span>
+            Clash Verge Rev<br>v2rayN
+          </div>
+          <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+            <span class="font-bold block text-slate-800">macOS</span>
+            Clash Verge Rev<br>FlClash
+          </div>
+        </div>
+      </div>
+
+      <div class="pt-2">
+        <button onclick="resetApp()" class="text-xs text-slate-400 hover:text-slate-600 underline">
+          搭建另一台服务器
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- 页脚 -->
+  <footer class="w-full text-center py-4 text-xs text-slate-400 border-t border-slate-200/50">
+    <p>Powered by vpn2qr & Cloudflare Serverless Architecture · 100% Client-Side E2EE</p>
+  </footer>
+
+  <!-- 引入业务前端交互脚本 -->
+  <script src="app.js"></script>
+</body>
+</html>
