@@ -168,7 +168,8 @@ async function executeDeploy(quickMode = false) {
   const sni = document.getElementById('adv-sni').value.trim() || 'gateway.icloud.com';
   const nodePort = document.getElementById('adv-nodeport').value.trim() || '443';
   const nodeName = document.getElementById('adv-nodename').value.trim() || 'VPS-Reality';
-  let workerDomain = document.getElementById('adv-worker').value.trim();
+  const DEFAULT_WORKER_RELAY = 'vpn2qr-relay.qstizi.workers.dev';
+  let workerDomain = document.getElementById('adv-worker').value.trim() || DEFAULT_WORKER_RELAY;
 
   let wsUrl = '';
   if (workerDomain) {
