@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>vpn2qr - 纯前端零知识 VPS 节点一键搭建工具</title>
+  <title>一贱建节点 - 纯前端零知识 VPS 节点一键搭建工具</title>
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="shortcut icon" href="favicon.ico">
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- QRCode.js (纯客户端矢量二维码渲染，零外部 API 依赖) -->
@@ -23,17 +26,16 @@
 <body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
 
   <!-- 顶部导航与隐私徽章 -->
-  <header class="w-full bg-white border-b border-slate-200 py-4 px-6 sticky top-0 z-30 shadow-xs">
+  <header class="w-full bg-white border-b border-slate-200 py-3.5 px-6 sticky top-0 z-30 shadow-xs">
     <div class="max-w-4xl mx-auto flex items-center justify-between">
-      <div class="flex items-center space-x-3">
-        <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-black text-lg shadow-sm">
-          ⚡
-        </div>
+      <!-- 点击 LOGO 回到主页 -->
+      <a href="/" onclick="event.preventDefault(); resetApp();" class="flex items-center space-x-3 cursor-pointer group select-none">
+        <img src="logo.png" alt="一贱建节点 LOGO" class="w-9 h-9 object-contain group-hover:scale-110 transition-transform">
         <div>
-          <h1 class="font-bold text-slate-900 text-base sm:text-lg leading-tight">vpn2qr Web</h1>
+          <h1 class="font-black text-slate-900 text-base sm:text-lg leading-tight group-hover:text-indigo-600 transition-colors">一贱建节点</h1>
           <p class="text-xs text-slate-500">免 SSH 工具 · 一键搭建 VLESS-Reality 节点</p>
         </div>
-      </div>
+      </a>
       <div class="flex items-center space-x-2">
         <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
           <svg class="w-3 h-3 mr-1 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
@@ -48,8 +50,8 @@
   <!-- 主体容器 -->
   <main class="max-w-2xl w-full mx-auto p-4 sm:p-6 my-auto">
 
-    <!-- 安全声明横幅 -->
-    <div class="mb-6 p-3.5 bg-blue-50/70 border border-blue-200/60 rounded-2xl flex items-start space-x-3 text-xs text-blue-900 leading-relaxed">
+    <!-- 安全声明横幅 (点击搭建后自动隐藏) -->
+    <div id="banner-privacy" class="mb-6 p-3.5 bg-blue-50/70 border border-blue-200/60 rounded-2xl flex items-start space-x-3 text-xs text-blue-900 leading-relaxed transition-all duration-300">
       <span class="text-base leading-none">🛡️</span>
       <div>
         <span class="font-semibold">绝对隐私保障：</span>
@@ -319,19 +321,13 @@
           </div>
         </div>
       </div>
-
-      <div class="pt-2">
-        <button onclick="resetApp()" class="text-xs text-slate-400 hover:text-slate-600 underline">
-          搭建另一台服务器
-        </button>
-      </div>
     </div>
 
   </main>
 
   <!-- 页脚 -->
   <footer class="w-full text-center py-4 text-xs text-slate-400 border-t border-slate-200/50">
-    <p>Powered by vpn2qr & Cloudflare Serverless Architecture · 100% Client-Side E2EE</p>
+    <p>一贱建节点 · 基于 vpn2qr & Cloudflare Serverless Architecture · 100% Client-Side E2EE</p>
   </footer>
 
   <!-- 引入业务前端交互脚本 -->

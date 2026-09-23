@@ -1,4 +1,4 @@
-# ⚡ vpn2qr Web - 纯前端零知识 VPS 节点一键搭建工具
+# 🖕 一贱建节点 - 纯前端零知识 VPS 节点一键搭建工具
 
 > 📌 **项目溯源声明与致谢**：  
 > 本项目是开源项目 [**vpn2qr (https://github.com/www222fff/vpn2qr)**](https://github.com/www222fff/vpn2qr) 的纯前端/Web 端无服务器（Serverless）增强版本。核心的 VLESS + XTLS-Vision + REALITY 协议配置、自动化部署逻辑及免重装快速提取工具均基于 **[www222fff/vpn2qr](https://github.com/www222fff/vpn2qr)** 实现。本项目致力于让不了解 SSH 终端操作的小白用户能够在浏览器中通过零知识安全通道一键完成节点部署与扫码。

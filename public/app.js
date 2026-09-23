@@ -184,6 +184,13 @@ async function executeDeploy(quickMode = false) {
   document.getElementById('card-form').classList.add('hidden');
   document.getElementById('card-diagnostic').classList.add('hidden');
   document.getElementById('card-progress').classList.remove('hidden');
+
+  // 点击搭建后隐藏上方的绝对隐私保障提示
+  const privacyBanner = document.getElementById('banner-privacy');
+  if (privacyBanner) {
+    privacyBanner.classList.add('hidden');
+  }
+
   clearLogs();
   updateStep(1);
 
@@ -304,6 +311,10 @@ async function retryDeploy(quickMode = false) {
 function returnToForm() {
   document.getElementById('card-diagnostic').classList.add('hidden');
   document.getElementById('card-form').classList.remove('hidden');
+  const privacyBanner = document.getElementById('banner-privacy');
+  if (privacyBanner) {
+    privacyBanner.classList.remove('hidden');
+  }
 }
 
 // 成功状态展示与二维码本地绘制
@@ -354,10 +365,20 @@ function downloadQRCode() {
   link.click();
 }
 
-// 重置并搭建另一台服务器
+// 重置并回到主页 (点击 LOGO 触发)
 function resetApp() {
-  document.getElementById('card-result').classList.add('hidden');
-  document.getElementById('card-form').classList.remove('hidden');
+  document.getElementById('card-result')?.classList.add('hidden');
+  document.getElementById('card-diagnostic')?.classList.add('hidden');
+  document.getElementById('card-progress')?.classList.add('hidden');
+  document.getElementById('card-form')?.classList.remove('hidden');
+
+  // 恢复显示绝对隐私保障提示
+  const privacyBanner = document.getElementById('banner-privacy');
+  if (privacyBanner) {
+    privacyBanner.classList.remove('hidden');
+  }
+
   document.getElementById('vps-password').value = '';
   document.getElementById('vps-key').value = '';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
