@@ -13,3 +13,8 @@ dist/
 # Ensure WASM binary is committed for Cloudflare Pages direct deployment
 !public/vpn2qr.wasm
 !public/wasm_exec.js
+
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
