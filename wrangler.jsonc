@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "1click2",
+  "name": "1click2vpn",
   "compatibility_date": "2026-09-21",
   "observability": {
     "enabled": true
