@@ -21,11 +21,19 @@
   <!-- Go WebAssembly 运行时桥接 -->
   <script src="wasm_exec.js"></script>
   <style>
+    html, body {
+      overflow-x: hidden;
+      max-width: 100vw;
+    }
     :root, body, button, input, select, textarea {
       font-family: 'LXGW WenKai', 'LXGW WenKai TC', '霞鹜文楷', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
     }
     code, kbd, samp, pre, .font-mono {
       font-family: 'LXGW WenKai Mono', 'LXGW WenKai Mono TC', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+    }
+    #qrcode-box canvas, #qrcode-box img {
+      max-width: 100% !important;
+      height: auto !important;
     }
     @keyframes pulse-subtle {
       0%, 100% { opacity: 1; }
@@ -36,13 +44,13 @@
     }
   </style>
 </head>
-<body class="bg-[#0e1015] text-zinc-100 antialiased min-h-screen flex flex-col justify-between selection:bg-blue-600 selection:text-white">
+<body class="bg-[#0e1015] text-zinc-100 antialiased min-h-screen flex flex-col justify-between selection:bg-white selection:text-black w-full max-w-full overflow-x-hidden">
 
   <!-- 顶部导航（50%透明度 + 毛玻璃滤镜） -->
-  <header class="w-full bg-black/50 backdrop-blur-md border-b border-white/10 py-3.5 px-6 sticky top-0 z-30 shadow-sm">
+  <header class="w-full max-w-full bg-black/50 backdrop-blur-md border-b border-white/10 py-3 px-4 sm:px-6 sticky top-0 z-30 shadow-sm">
     <div class="max-w-4xl mx-auto flex items-center justify-between">
       <!-- 点击 LOGO 回到主页 -->
-      <a href="/" onclick="event.preventDefault(); resetApp();" class="flex items-center space-x-2.5 sm:space-x-3 cursor-pointer group select-none shrink-0">
+      <a href="/" onclick="event.preventDefault(); resetApp();" class="flex items-center space-x-2.5 sm:space-x-3 cursor-pointer group select-none shrink-0 min-w-0">
         <img src="logo.png" 
              alt="一贱建节点 LOGO" 
              width="36" 
@@ -51,21 +59,21 @@
              decoding="async"
              onerror="this.onerror=null; this.src='favicon.png';"
              class="w-9 h-9 min-w-[36px] min-h-[36px] shrink-0 object-contain group-hover:opacity-80 transition-opacity">
-        <div>
-          <h1 class="font-black text-white text-base sm:text-lg leading-tight group-hover:text-blue-400 transition-colors flex items-center space-x-1.5">
-            <span>一贱建节点</span>
-            <span class="text-xs text-zinc-400 font-medium tracking-normal select-none">· SSH 工具</span>
+        <div class="min-w-0">
+          <h1 class="font-black text-white text-base sm:text-lg leading-tight group-hover:opacity-80 transition-opacity flex items-center space-x-1.5 flex-wrap sm:flex-nowrap">
+            <span class="shrink-0">一贱建节点</span>
+            <span class="text-xs text-zinc-400 font-medium tracking-normal select-none shrink-0">· SSH 工具</span>
           </h1>
-          <p class="text-xs text-zinc-400 font-medium">一键搭建 VLESS-Reality 节点</p>
+          <p class="text-xs text-zinc-400 font-medium truncate">一键搭建 VLESS-Reality 节点</p>
         </div>
       </a>
 
       <!-- 右上角外链：家宽导航 (LOGO + 名称，无背景，新标签页打开) -->
       <a href="https://jiakuan.link" target="_blank" rel="noopener noreferrer" 
-         class="inline-flex items-center space-x-1.5 text-zinc-300 hover:text-white text-xs font-semibold transition-colors group">
-        <img src="jiakuan-logo.png" alt="家宽导航 LOGO" class="w-4 h-4 rounded-full object-cover">
-        <span>家宽导航</span>
-        <svg class="w-3 h-3 text-zinc-400 group-hover:text-zinc-200 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+         class="inline-flex items-center space-x-1.5 text-zinc-300 hover:text-white text-xs font-semibold transition-colors group shrink-0 ml-2">
+        <img src="jiakuan-logo.png" alt="家宽导航 LOGO" class="w-4 h-4 rounded-full object-cover shrink-0">
+        <span class="shrink-0">家宽导航</span>
+        <svg class="w-3 h-3 text-zinc-400 group-hover:text-zinc-200 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
         </svg>
       </a>
@@ -76,7 +84,7 @@
   <main class="max-w-2xl w-full mx-auto p-4 sm:p-6 my-auto">
 
     <!-- 表单卡片（配置服务器信息窗口，50%透明度 + 毛玻璃滤镜） -->
-    <div id="card-form" class="bg-black/50 backdrop-blur-md rounded-3xl p-6 sm:p-8 shadow-2xl border border-white/10 transition-all duration-300">
+    <div id="card-form" class="bg-black/50 backdrop-blur-md rounded-3xl p-5 sm:p-8 shadow-2xl border border-white/10 transition-all duration-300 overflow-hidden">
       <div class="mb-6">
         <h2 class="text-xl font-bold text-white">配置服务器信息</h2>
         <p class="text-xs text-zinc-400 mt-1">请输入您购买的 VPS 远程连接凭证（通常在 VPS 后台或开通邮件中）</p>
@@ -86,14 +94,14 @@
         <!-- VPS IP 与端口 -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div class="sm:col-span-2">
-            <label class="block text-xs font-semibold text-zinc-300 mb-1.5">VPS 公网 IP 地址 <span class="text-rose-400">*</span></label>
+            <label class="block text-xs font-semibold text-zinc-300 mb-1.5">VPS 公网 IP 地址 <span class="text-white font-bold">*</span></label>
             <input id="vps-host" type="text" required placeholder="例如：198.51.100.23" 
-                   class="w-full px-3.5 py-2.5 bg-black/40 border border-zinc-700/60 rounded-xl text-sm text-zinc-100 placeholder-zinc-500 focus:bg-black/60 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition">
+                   class="w-full px-3.5 py-2.5 bg-black/40 border border-zinc-700/60 rounded-xl text-sm text-zinc-100 placeholder-zinc-500 focus:bg-black/60 focus:border-white focus:ring-1 focus:ring-white outline-none transition">
           </div>
           <div>
             <label class="block text-xs font-semibold text-zinc-300 mb-1.5">SSH 端口</label>
             <input id="vps-port" type="number" value="22" required min="1" max="65535" 
-                   class="w-full px-3.5 py-2.5 bg-black/40 border border-zinc-700/60 rounded-xl text-sm text-zinc-100 placeholder-zinc-500 focus:bg-black/60 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition">
+                   class="w-full px-3.5 py-2.5 bg-black/40 border border-zinc-700/60 rounded-xl text-sm text-zinc-100 placeholder-zinc-500 focus:bg-black/60 focus:border-white focus:ring-1 focus:ring-white outline-none transition">
           </div>
         </div>
 
@@ -101,15 +109,15 @@
         <div>
           <label class="block text-xs font-semibold text-zinc-300 mb-1.5">用户名</label>
           <input id="vps-user" type="text" value="root" required 
-                 class="w-full px-3.5 py-2.5 bg-black/40 border border-zinc-700/60 rounded-xl text-sm text-zinc-100 placeholder-zinc-500 focus:bg-black/60 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition">
+                 class="w-full px-3.5 py-2.5 bg-black/40 border border-zinc-700/60 rounded-xl text-sm text-zinc-100 placeholder-zinc-500 focus:bg-black/60 focus:border-white focus:ring-1 focus:ring-white outline-none transition">
         </div>
 
         <!-- 认证模式切换 -->
         <div>
           <div class="flex items-center justify-between mb-1.5">
-            <label class="text-xs font-semibold text-zinc-300">认证凭证 <span class="text-rose-400">*</span></label>
+            <label class="text-xs font-semibold text-zinc-300">密码凭证 <span class="text-white font-bold">*</span></label>
             <div class="flex text-xs space-x-2">
-              <button type="button" id="tab-pwd" onclick="switchAuthMode('password')" class="font-semibold text-blue-400 border-b-2 border-blue-500 pb-0.5">密码登录</button>
+              <button type="button" id="tab-pwd" onclick="switchAuthMode('password')" class="font-semibold text-white border-b-2 border-white pb-0.5">密码登录</button>
               <button type="button" id="tab-key" onclick="switchAuthMode('key')" class="text-zinc-400 hover:text-zinc-200 pb-0.5">SSH 私钥</button>
             </div>
           </div>
@@ -117,7 +125,7 @@
           <!-- 密码输入框 -->
           <div id="auth-pwd-container" class="relative">
             <input id="vps-password" type="password" placeholder="输入 root 用户密码" 
-                   class="w-full px-3.5 py-2.5 bg-black/40 border border-zinc-700/60 rounded-xl text-sm text-zinc-100 placeholder-zinc-500 focus:bg-black/60 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition pr-10">
+                   class="w-full px-3.5 py-2.5 bg-black/40 border border-zinc-700/60 rounded-xl text-sm text-zinc-100 placeholder-zinc-500 focus:bg-black/60 focus:border-white focus:ring-1 focus:ring-white outline-none transition pr-10">
             <button type="button" onclick="togglePasswordVisibility()" class="absolute right-3 top-2.5 text-zinc-400 hover:text-zinc-200 text-xs">
               <span id="eye-icon">👁️</span>
             </button>
@@ -126,7 +134,7 @@
           <!-- 私钥输入框 (默认隐藏) -->
           <div id="auth-key-container" class="hidden">
             <textarea id="vps-key" rows="4" placeholder="粘贴私钥文本 (-----BEGIN OPENSSH PRIVATE KEY----- ...)" 
-                      class="w-full px-3.5 py-2.5 bg-black/40 border border-zinc-700/60 rounded-xl text-xs font-mono text-zinc-100 placeholder-zinc-500 focus:bg-black/60 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition"></textarea>
+                      class="w-full px-3.5 py-2.5 bg-black/40 border border-zinc-700/60 rounded-xl text-xs font-mono text-zinc-100 placeholder-zinc-500 focus:bg-black/60 focus:border-white focus:ring-1 focus:ring-white outline-none transition"></textarea>
           </div>
         </div>
 
@@ -142,24 +150,24 @@
               <div>
                 <label class="block text-[11px] font-medium text-zinc-300 mb-1">节点伪装域名 (SNI)</label>
                 <input id="adv-sni" type="text" value="gateway.icloud.com" 
-                       class="w-full px-3 py-1.5 bg-black/50 border border-zinc-700/60 rounded-lg text-xs text-zinc-200 outline-none focus:border-blue-500">
+                       class="w-full px-3 py-1.5 bg-black/50 border border-zinc-700/60 rounded-lg text-xs text-zinc-200 outline-none focus:border-white">
               </div>
               <div>
                 <label class="block text-[11px] font-medium text-zinc-300 mb-1">Reality 端口</label>
                 <input id="adv-nodeport" type="number" value="443" min="1" max="65535" 
-                       class="w-full px-3 py-1.5 bg-black/50 border border-zinc-700/60 rounded-lg text-xs text-zinc-200 outline-none focus:border-blue-500">
+                       class="w-full px-3 py-1.5 bg-black/50 border border-zinc-700/60 rounded-lg text-xs text-zinc-200 outline-none focus:border-white">
               </div>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label class="block text-[11px] font-medium text-zinc-300 mb-1">节点名称</label>
                 <input id="adv-nodename" type="text" value="VPS-Reality" 
-                       class="w-full px-3 py-1.5 bg-black/50 border border-zinc-700/60 rounded-lg text-xs text-zinc-200 outline-none focus:border-blue-500">
+                       class="w-full px-3 py-1.5 bg-black/50 border border-zinc-700/60 rounded-lg text-xs text-zinc-200 outline-none focus:border-white">
               </div>
               <div>
                 <label class="block text-[11px] font-medium text-zinc-300 mb-1">Cloudflare 中继 Worker 域名</label>
                 <input id="adv-worker" type="text" value="vpn2qr-relay.qstizi.workers.dev" 
-                       class="w-full px-3 py-1.5 bg-black/50 border border-zinc-700/60 rounded-lg text-xs text-zinc-200 outline-none focus:border-blue-500">
+                       class="w-full px-3 py-1.5 bg-black/50 border border-zinc-700/60 rounded-lg text-xs text-zinc-200 outline-none focus:border-white">
               </div>
             </div>
           </div>
@@ -167,13 +175,13 @@
 
         <!-- 提交按钮 -->
         <button id="btn-submit" type="submit" 
-                class="w-full py-3.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold rounded-xl transition duration-150 flex items-center justify-center space-x-2">
-          <img src="logo.png" alt="一贱建节点" class="w-5 h-5 object-contain inline-block">
+                class="w-full py-3.5 bg-white hover:bg-zinc-200 active:bg-zinc-300 text-black font-bold rounded-xl transition duration-150 flex items-center justify-center space-x-2 shadow-lg shadow-white/5">
+          <img src="logo.png" alt="一贱建节点" class="w-5 h-5 object-contain inline-block invert">
           <span>一键搭建节点并生成二维码</span>
         </button>
 
         <!-- 表单窗口底部隐私保障提示 -->
-        <div class="pt-2 text-center text-xs text-zinc-400 flex items-center justify-center space-x-1.5 select-none">
+        <div class="pt-2 text-center text-xs text-zinc-400 flex items-center justify-center space-x-1.5 select-none flex-wrap leading-relaxed">
           <span>🛡️</span>
           <span>隐私保障：端侧 WASM 本地加密 · 账号密码不存数据库 · 页面刷新即销毁</span>
         </div>
@@ -181,9 +189,9 @@
     </div>
 
     <!-- 运行状态与进度卡片 (部署中展示，50%透明度) -->
-    <div id="card-progress" class="hidden bg-black/50 backdrop-blur-md rounded-3xl p-6 sm:p-8 shadow-2xl border border-white/10 space-y-6 text-zinc-100">
+    <div id="card-progress" class="hidden bg-black/50 backdrop-blur-md rounded-3xl p-5 sm:p-8 shadow-2xl border border-white/10 space-y-6 text-zinc-100 overflow-hidden">
       <div class="text-center space-y-2">
-        <div class="w-12 h-12 mx-auto rounded-2xl bg-blue-950/60 border border-blue-500/30 flex items-center justify-center text-blue-400 text-2xl animate-bounce">
+        <div class="w-12 h-12 mx-auto rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white text-2xl animate-bounce">
           ⚙️
         </div>
         <h3 id="progress-title" class="text-lg font-bold text-white">正在初始化安全隧道...</h3>
@@ -193,8 +201,8 @@
       <!-- 阶段步骤指示条 -->
       <div class="space-y-3 max-w-md mx-auto py-2">
         <div class="flex items-center space-x-3 text-xs" id="step-1">
-          <div class="step-icon w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">1</div>
-          <span class="font-medium text-zinc-200">建立端到端加密 SSH 通道</span>
+          <div class="step-icon w-6 h-6 rounded-full bg-white text-black flex items-center justify-center font-bold">1</div>
+          <span class="font-bold text-white">建立端到端加密 SSH 通道</span>
         </div>
         <div class="flex items-center space-x-3 text-xs" id="step-2">
           <div class="step-icon w-6 h-6 rounded-full bg-zinc-800 text-zinc-400 flex items-center justify-center font-bold">2</div>
@@ -214,23 +222,23 @@
       <div class="border border-white/10 rounded-2xl overflow-hidden bg-black/80">
         <div class="px-4 py-2 bg-zinc-900/80 flex items-center justify-between text-xs text-zinc-400">
           <div class="flex items-center space-x-2">
-            <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
-            <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
-            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-white"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-zinc-500"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-zinc-700"></span>
             <span class="ml-2 font-mono text-[11px] text-zinc-300">live-terminal.log</span>
           </div>
           <button type="button" onclick="clearLogs()" class="hover:text-zinc-200 text-[10px]">清屏</button>
         </div>
-        <div id="terminal-logs" class="h-44 p-3.5 overflow-y-auto font-mono text-xs text-emerald-400 space-y-1 select-text">
+        <div id="terminal-logs" class="h-44 p-3.5 overflow-y-auto font-mono text-xs text-zinc-300 space-y-1 select-text">
           <div class="text-zinc-500">准备启动端侧 WebAssembly 执行环境...</div>
         </div>
       </div>
     </div>
 
     <!-- 智能诊断与一键重连卡片 (遇到问题时展示，50%透明度) -->
-    <div id="card-diagnostic" class="hidden bg-black/50 backdrop-blur-md rounded-3xl p-6 sm:p-8 shadow-2xl border border-amber-500/20 space-y-6 text-zinc-100">
+    <div id="card-diagnostic" class="hidden bg-black/50 backdrop-blur-md rounded-3xl p-5 sm:p-8 shadow-2xl border border-white/10 space-y-6 text-zinc-100 overflow-hidden">
       <div class="flex items-start space-x-4">
-        <div class="w-12 h-12 rounded-2xl bg-amber-950/40 border border-amber-500/30 flex items-center justify-center text-amber-400 text-2xl shrink-0">
+        <div class="w-12 h-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white text-2xl shrink-0">
           🔍
         </div>
         <div>
@@ -243,8 +251,8 @@
       <div class="space-y-2.5 bg-black/40 p-4 rounded-2xl border border-white/10 text-xs">
         <div class="flex items-center justify-between py-1 border-b border-zinc-800">
           <span class="text-zinc-400">Cloudflare 盲中继通路</span>
-          <span id="diag-relay" class="font-medium text-emerald-400 flex items-center">
-            <span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></span> 正常畅通
+          <span id="diag-relay" class="font-medium text-white flex items-center">
+            <span class="w-2 h-2 rounded-full bg-white mr-1.5"></span> 正常畅通
           </span>
         </div>
         <div class="flex items-center justify-between py-1 border-b border-zinc-800">
@@ -261,28 +269,28 @@
         </div>
         <div class="flex items-center justify-between py-1">
           <span class="text-zinc-400">异常摘要</span>
-          <span id="diag-reason" class="font-medium text-rose-400 truncate max-w-[220px]">未知异常</span>
+          <span id="diag-reason" class="font-medium text-white truncate max-w-[220px]">未知异常</span>
         </div>
       </div>
 
       <!-- 针对性解决建议 -->
-      <div class="p-3.5 bg-amber-950/30 border border-amber-500/30 rounded-2xl text-xs text-amber-200 space-y-1">
-        <div class="font-semibold flex items-center space-x-1">
+      <div class="p-3.5 bg-white/5 border border-white/10 rounded-2xl text-xs text-zinc-300 space-y-1">
+        <div class="font-semibold flex items-center space-x-1 text-white">
           <span>💡</span>
           <span>排查与优化建议：</span>
         </div>
-        <div id="diag-advice" class="leading-relaxed pl-5 text-amber-300/90">
+        <div id="diag-advice" class="leading-relaxed pl-5 text-zinc-400">
           正在生成排查建议...
         </div>
       </div>
 
       <!-- 操作按钮群 -->
       <div class="space-y-2 pt-2">
-        <button onclick="retryDeploy(false)" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl transition duration-150 flex items-center justify-center space-x-2 text-xs">
+        <button onclick="retryDeploy(false)" class="w-full py-3 bg-white hover:bg-zinc-200 active:bg-zinc-300 text-black font-bold rounded-xl transition duration-150 flex items-center justify-center space-x-2 text-xs shadow-md">
           <span>🔄 一键重新连接 (保持现有参数，重新搭建)</span>
         </button>
 
-        <button onclick="retryDeploy(true)" class="w-full py-2.5 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-500/30 font-semibold rounded-xl transition duration-150 flex items-center justify-center space-x-2 text-xs">
+        <button onclick="retryDeploy(true)" class="w-full py-2.5 bg-white/10 hover:bg-white/20 active:bg-white/30 text-white border border-white/20 font-bold rounded-xl transition duration-150 flex items-center justify-center space-x-2 text-xs">
           <span>⚡ 快速取回已有节点 (免重装模式，1~2 秒即可返回)</span>
         </button>
 
@@ -293,7 +301,7 @@
     </div>
 
     <!-- 成功结果卡片 (完成后展示，50%透明度) -->
-    <div id="card-result" class="hidden bg-black/50 backdrop-blur-md rounded-3xl p-6 sm:p-8 shadow-2xl border border-white/10 space-y-6 text-center text-zinc-100">
+    <div id="card-result" class="hidden bg-black/50 backdrop-blur-md rounded-3xl p-5 sm:p-8 shadow-2xl border border-white/10 space-y-6 text-center text-zinc-100 max-w-full overflow-hidden">
       <div>
         <h3 class="text-xl font-bold text-white flex items-center justify-center space-x-2">
           <span>🎉</span>
@@ -304,25 +312,26 @@
 
       <!-- 二维码展示 (无多余外框，纯净圆角白底直接展示) -->
       <div class="flex flex-col items-center justify-center py-2">
-        <div id="qrcode-box" class="p-4 sm:p-5 bg-white rounded-3xl shadow-xl inline-block"></div>
-        <button onclick="downloadQRCode()" class="mt-4 inline-flex items-center space-x-1.5 text-xs text-blue-400 hover:text-blue-300 font-medium transition">
+        <div id="qrcode-box" class="p-4 sm:p-5 bg-white rounded-3xl shadow-xl inline-block max-w-full"></div>
+        <button onclick="downloadQRCode()" class="mt-4 inline-flex items-center space-x-1.5 text-xs text-white hover:text-zinc-300 underline underline-offset-4 font-medium transition">
           <span>💾 保存二维码图片到本地</span>
         </button>
       </div>
 
       <!-- 节点链接与一键复制 -->
-      <div class="space-y-2 text-left">
+      <div class="space-y-2 text-left w-full max-w-full">
         <label class="block text-xs font-semibold text-zinc-300">节点链接 (VLESS URI)</label>
-        <div class="flex items-center space-x-2">
-          <input id="vless-link" readonly type="text" class="flex-1 px-3.5 py-2.5 bg-black/40 border border-zinc-700/60 rounded-xl text-xs font-mono text-zinc-200 select-all outline-none">
-          <button onclick="copyVlessLink()" class="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold transition shrink-0">
-            📋 复制链接
+        <div class="flex items-center space-x-2 w-full max-w-full">
+          <input id="vless-link" readonly type="text" class="flex-1 min-w-0 px-3 sm:px-3.5 py-2.5 bg-black/40 border border-zinc-700/60 rounded-xl text-xs font-mono text-zinc-200 select-all outline-none">
+          <button id="btn-copy-uri" onclick="copyVlessLink()" class="px-3.5 sm:px-4 py-2.5 bg-white hover:bg-zinc-200 active:bg-zinc-300 text-black font-bold rounded-xl text-xs transition shrink-0 whitespace-nowrap flex items-center space-x-1 shadow-md">
+            <span>📋</span>
+            <span>复制链接</span>
           </button>
         </div>
       </div>
 
       <!-- 客户端使用指南 -->
-      <div class="pt-4 border-t border-white/10 text-left">
+      <div class="pt-4 border-t border-white/10 text-left w-full max-w-full">
         <h4 class="text-xs font-bold text-zinc-300 mb-2">📱 支持扫码导入的客户端：</h4>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-zinc-400">
           <div class="p-2.5 bg-black/40 rounded-xl border border-white/10">
@@ -348,8 +357,8 @@
   </main>
 
   <!-- 页脚 (50%透明度 + 毛玻璃效果) -->
-  <footer class="w-full text-center py-4 text-xs text-zinc-400 bg-black/50 backdrop-blur-md border-t border-white/10">
-    <p>Made with ❤️ <a href="https://github.com/kanpianer/1click2VPN" target="_blank" rel="noopener noreferrer" class="underline font-semibold hover:text-white text-zinc-100 transition-colors">Github</a> 项目开源，您输入的信息不会上传到后端数据库。</p>
+  <footer class="w-full max-w-full text-center py-4 px-4 sm:px-6 text-xs text-zinc-400 bg-black/50 backdrop-blur-md border-t border-white/10">
+    <p class="max-w-xl mx-auto leading-relaxed">Made with ❤️ <a href="https://github.com/kanpianer/1click2VPN" target="_blank" rel="noopener noreferrer" class="underline font-semibold hover:text-white text-zinc-100 transition-colors">Github</a> 项目开源，您输入的信息不会上传到后端数据库。</p>
   </footer>
 
   <!-- 引入业务前端交互脚本 -->

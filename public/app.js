@@ -44,12 +44,12 @@ function switchAuthMode(mode) {
   const keyContainer = document.getElementById('auth-key-container');
 
   if (mode === 'password') {
-    tabPwd.className = 'font-semibold text-blue-400 border-b-2 border-blue-500 pb-0.5';
+    tabPwd.className = 'font-semibold text-white border-b-2 border-white pb-0.5';
     tabKey.className = 'text-zinc-400 hover:text-zinc-200 pb-0.5';
     pwdContainer.classList.remove('hidden');
     keyContainer.classList.add('hidden');
   } else {
-    tabKey.className = 'font-semibold text-blue-400 border-b-2 border-blue-500 pb-0.5';
+    tabKey.className = 'font-semibold text-white border-b-2 border-white pb-0.5';
     tabPwd.className = 'text-zinc-400 hover:text-zinc-200 pb-0.5';
     keyContainer.classList.remove('hidden');
     pwdContainer.classList.add('hidden');
@@ -105,14 +105,14 @@ function updateStep(stepNumber) {
 
     if (i < stepNumber) {
       // 已完成
-      icon.className = 'step-icon w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold';
+      icon.className = 'step-icon w-6 h-6 rounded-full bg-white text-black flex items-center justify-center font-bold';
       icon.innerHTML = '✓';
       text.className = 'font-medium text-zinc-300';
     } else if (i === stepNumber) {
       // 进行中
-      icon.className = 'step-icon w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold animate-pulse';
+      icon.className = 'step-icon w-6 h-6 rounded-full bg-white text-black flex items-center justify-center font-bold animate-pulse';
       icon.innerHTML = i;
-      text.className = 'font-bold text-blue-400';
+      text.className = 'font-bold text-white';
     } else {
       // 未到达
       icon.className = 'step-icon w-6 h-6 rounded-full bg-zinc-800 text-zinc-400 flex items-center justify-center font-bold';
