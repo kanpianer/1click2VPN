@@ -25,9 +25,14 @@ async function initWasm() {
   }
 }
 
-// 页面加载完成后预加载 WASM
+// 页面加载完成后预加载 WASM 并支持 #test-success 本地快速预览
 window.addEventListener('DOMContentLoaded', () => {
   initWasm();
+  if (window.location.hash === '#test-success') {
+    setTimeout(() => {
+      showSuccessResult('vless://12345678-1234-1234-1234-123456789abc@198.51.100.23:443?security=reality#VPS-Reality');
+    }, 200);
+  }
 });
 
 // 切换认证模式
@@ -317,10 +322,93 @@ function returnToForm() {
   }
 }
 
+// 页面中间洒花特效
+function triggerCelebrationConfetti() {
+  if (typeof confetti !== 'function') return;
+
+  // 居中多波段爆发洒花
+  const count = 180;
+  const defaults = {
+    origin: { x: 0.5, y: 0.5 },
+    zIndex: 9999,
+  };
+
+  function fire(particleRatio, opts) {
+    confetti(Object.assign({}, defaults, opts, {
+      particleCount: Math.floor(count * particleRatio),
+    }));
+  }
+
+  fire(0.25, {
+    spread: 30,
+    startVelocity: 55,
+  });
+  fire(0.2, {
+    spread: 60,
+  });
+  fire(0.35, {
+    spread: 100,
+    decay: 0.91,
+    scalar: 0.8,
+  });
+  fire(0.1, {
+    spread: 120,
+    startVelocity: 25,
+    decay: 0.92,
+    scalar: 1.2,
+  });
+  fire(0.1, {
+    spread: 120,
+    startVelocity: 45,
+  });
+}
+
+// 播放胜利/庆祝音效 (纯端侧 Web Audio API 合成，零外部音频资源依赖)
+function playCelebrationSound() {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+
+    // 悦耳清脆的胜利和弦音序 (C5 - E5 - G5 - C6 - E6)
+    const notes = [
+      { freq: 523.25, time: 0.00, dur: 0.20 }, // C5
+      { freq: 659.25, time: 0.08, dur: 0.20 }, // E5
+      { freq: 783.99, time: 0.16, dur: 0.24 }, // G5
+      { freq: 1046.50, time: 0.26, dur: 0.60 }, // C6 (胜利主音)
+      { freq: 1318.51, time: 0.28, dur: 0.65 }, // E6 (和声泛音)
+    ];
+
+    notes.forEach((n) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle'; // 柔和温润的八音盒/木琴音色
+      osc.frequency.setValueAtTime(n.freq, ctx.currentTime + n.time);
+
+      gain.gain.setValueAtTime(0.001, ctx.currentTime + n.time);
+      gain.gain.exponentialRampToValueAtTime(0.35, ctx.currentTime + n.time + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + n.time + n.dur);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(ctx.currentTime + n.time);
+      osc.stop(ctx.currentTime + n.time + n.dur);
+    });
+  } catch (err) {
+    console.warn('[Audio] 播放庆祝音效失败:', err);
+  }
+}
+
 // 成功状态展示与二维码本地绘制
 function showSuccessResult(vlessUrl) {
-  document.getElementById('card-progress').classList.add('hidden');
-  document.getElementById('card-result').classList.remove('hidden');
+  document.getElementById('card-form')?.classList.add('hidden');
+  document.getElementById('card-diagnostic')?.classList.add('hidden');
+  document.getElementById('card-progress')?.classList.add('hidden');
+  document.getElementById('card-result')?.classList.remove('hidden');
 
   document.getElementById('vless-link').value = vlessUrl;
 
@@ -336,6 +424,12 @@ function showSuccessResult(vlessUrl) {
     colorLight: '#ffffff',
     correctLevel: QRCode.CorrectLevel.M,
   });
+
+  // 触发页面中间洒花特效与庆祝音效
+  setTimeout(() => {
+    triggerCelebrationConfetti();
+    playCelebrationSound();
+  }, 100);
 }
 
 // 一键复制 VLESS 链接

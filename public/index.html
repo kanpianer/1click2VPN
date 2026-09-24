@@ -16,6 +16,8 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.1.0/style.css">
   <!-- QRCode.js (纯客户端矢量二维码渲染，零外部 API 依赖) -->
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <!-- canvas-confetti (全客户端撒花庆祝特效) -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.4/dist/confetti.browser.min.js"></script>
   <!-- Go WebAssembly 运行时桥接 -->
   <script src="wasm_exec.js"></script>
   <style>
@@ -282,18 +284,18 @@
 
     <!-- 成功结果卡片 (完成后展示，50%透明度) -->
     <div id="card-result" class="hidden bg-black/50 backdrop-blur-md rounded-3xl p-6 sm:p-8 shadow-2xl border border-white/10 space-y-6 text-center text-zinc-100">
-      <div class="inline-flex p-3 rounded-2xl bg-emerald-950/50 border border-emerald-500/30 text-emerald-400 text-3xl mb-1">
-        🎉
-      </div>
       <div>
-        <h3 class="text-xl font-bold text-white">节点已成功搭建！</h3>
-        <p class="text-xs text-zinc-400 mt-1">请使用手机代理软件扫描下方二维码即可自动添加</p>
+        <h3 class="text-xl font-bold text-white flex items-center justify-center space-x-2">
+          <span>🎉</span>
+          <span>节点已成功搭建！</span>
+        </h3>
+        <p class="text-xs text-zinc-400 mt-1.5">请使用手机代理软件扫描下方二维码即可自动添加</p>
       </div>
 
-      <!-- 二维码容器 -->
-      <div class="flex flex-col items-center justify-center p-6 bg-black/40 rounded-2xl border border-white/10 shadow-inner">
-        <div id="qrcode-box" class="p-3 bg-white rounded-2xl shadow-sm border border-slate-200"></div>
-        <button onclick="downloadQRCode()" class="mt-4 inline-flex items-center space-x-1.5 text-xs text-blue-400 hover:text-blue-300 font-medium">
+      <!-- 二维码展示 (无多余外框，纯净圆角白底直接展示) -->
+      <div class="flex flex-col items-center justify-center py-2">
+        <div id="qrcode-box" class="p-4 sm:p-5 bg-white rounded-3xl shadow-xl inline-block"></div>
+        <button onclick="downloadQRCode()" class="mt-4 inline-flex items-center space-x-1.5 text-xs text-blue-400 hover:text-blue-300 font-medium transition">
           <span>💾 保存二维码图片到本地</span>
         </button>
       </div>
