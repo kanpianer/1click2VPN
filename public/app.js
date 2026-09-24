@@ -39,13 +39,13 @@ function switchAuthMode(mode) {
   const keyContainer = document.getElementById('auth-key-container');
 
   if (mode === 'password') {
-    tabPwd.className = 'font-semibold text-indigo-600 border-b-2 border-indigo-600 pb-0.5';
-    tabKey.className = 'text-slate-400 hover:text-slate-600 pb-0.5';
+    tabPwd.className = 'font-semibold text-blue-400 border-b-2 border-blue-500 pb-0.5';
+    tabKey.className = 'text-zinc-400 hover:text-zinc-200 pb-0.5';
     pwdContainer.classList.remove('hidden');
     keyContainer.classList.add('hidden');
   } else {
-    tabKey.className = 'font-semibold text-indigo-600 border-b-2 border-indigo-600 pb-0.5';
-    tabPwd.className = 'text-slate-400 hover:text-slate-600 pb-0.5';
+    tabKey.className = 'font-semibold text-blue-400 border-b-2 border-blue-500 pb-0.5';
+    tabPwd.className = 'text-zinc-400 hover:text-zinc-200 pb-0.5';
     keyContainer.classList.remove('hidden');
     pwdContainer.classList.add('hidden');
   }
@@ -102,17 +102,17 @@ function updateStep(stepNumber) {
       // 已完成
       icon.className = 'step-icon w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold';
       icon.innerHTML = '✓';
-      text.className = 'font-medium text-slate-700';
+      text.className = 'font-medium text-zinc-300';
     } else if (i === stepNumber) {
       // 进行中
-      icon.className = 'step-icon w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold animate-pulse';
+      icon.className = 'step-icon w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold animate-pulse';
       icon.innerHTML = i;
-      text.className = 'font-bold text-indigo-600';
+      text.className = 'font-bold text-blue-400';
     } else {
       // 未到达
-      icon.className = 'step-icon w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-bold';
+      icon.className = 'step-icon w-6 h-6 rounded-full bg-zinc-800 text-zinc-400 flex items-center justify-center font-bold';
       icon.innerHTML = i;
-      text.className = 'font-medium text-slate-400';
+      text.className = 'font-medium text-zinc-500';
     }
   }
 }
