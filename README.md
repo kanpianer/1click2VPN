@@ -1,7 +1,9 @@
 # 🖕 一贱建节点 - 纯前端零知识 VPS 节点一键搭建工具
 
-> 📌 **项目溯源声明与致谢**：  
-> 本项目是开源项目 [**vpn2qr (https://github.com/www222fff/vpn2qr)**](https://github.com/www222fff/vpn2qr) 的纯前端/Web 端无服务器（Serverless）增强版本。核心的 VLESS + XTLS-Vision + REALITY 协议配置、自动化部署逻辑及免重装快速提取工具均基于 **[www222fff/vpn2qr](https://github.com/www222fff/vpn2qr)** 实现。本项目致力于让不了解 SSH 终端操作的小白用户能够在浏览器中通过零知识安全通道一键完成节点部署与扫码。
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+> 📌 **项目溯源声明与开源协议致敬**：  
+> 本项目是开源项目 [**vpn2qr (https://github.com/www222fff/vpn2qr)**](https://github.com/www222fff/vpn2qr) 的纯前端/Web 端无服务器（Serverless）增强版本，遵循 **MIT 开源协议**。核心的 VLESS + XTLS-Vision + REALITY 协议配置、自动化部署逻辑及免重装快速提取工具均基于 **[www222fff/vpn2qr](https://github.com/www222fff/vpn2qr)** 实现。特此向原作者 [www222fff](https://github.com/www222fff) 对开源社区的卓越贡献致以诚挚敬意，本项目完全遵守原项目的 MIT 协议条款并保留原作者版权声明。
 
 ---
 
@@ -63,6 +65,7 @@
 ├── worker/                 # Cloudflare Worker 盲中继服务源码
 │   ├── worker.js           # 基于 cloudflare:sockets 的 WebSocket ⇄ TCP 中继与 SSRF 防护
 │   └── wrangler.toml       # Cloudflare Wrangler 配置文件
+├── LICENSE                 # MIT 开源许可证 (保留上游版权声明)
 └── README.md
 ```
 
@@ -135,3 +138,15 @@ bash wasm/build.sh
 
 1. 本工具仅供个人服务器管理与合规网络运维学习之用，请严格遵守所在国家及服务商的相关法律法规。
 2. 节点的 UUID、私钥、二维码具有唯一使用权限，请勿截屏发送到公共社交网络或群聊中。
+
+---
+
+## 📄 开源许可证 (License)
+
+本项目遵循 **[MIT License](LICENSE)** 开源协议。
+
+* 本项目基于开源项目 [**vpn2qr (https://github.com/www222fff/vpn2qr)**](https://github.com/www222fff/vpn2qr) 二次开发，严格遵守上游 MIT 许可证要求。
+* 完整保留上游开源项目版权声明：
+  > `Copyright (c) 2026 www222fff (https://github.com/www222fff/vpn2qr)`
+* 本项目衍生及新增的纯前端 WebAssembly、Cloudflare Worker 盲中继与交互层代码同样采用 MIT 协议开源。
+

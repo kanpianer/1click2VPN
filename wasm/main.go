@@ -1,3 +1,6 @@
+// Package main implements a zero-knowledge WebAssembly SSH client for 1click2VPN.
+// Core VLESS installation and retrieval logic is derived from vpn2qr (https://github.com/www222fff/vpn2qr).
+// Licensed under the MIT License.
 package main
 
 import (
