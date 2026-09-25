@@ -47,8 +47,8 @@
 <body class="bg-[#0e1015] text-zinc-100 antialiased min-h-screen flex flex-col justify-between selection:bg-white selection:text-black w-full max-w-full overflow-x-hidden">
 
   <!-- 顶部导航（50%透明度 + 毛玻璃滤镜） -->
-  <header class="w-full max-w-full bg-black/50 backdrop-blur-md border-b border-white/10 py-3 px-4 sm:px-6 sticky top-0 z-30 shadow-sm">
-    <div class="max-w-4xl mx-auto flex items-center justify-between">
+  <header class="w-full max-w-full bg-black/50 backdrop-blur-md border-b border-white/10 py-3 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-2xl mx-auto px-4 sm:px-6 flex items-center justify-between">
       <!-- 点击 LOGO 回到主页 -->
       <a href="/" onclick="event.preventDefault(); resetApp();" class="flex items-center space-x-2.5 sm:space-x-3 cursor-pointer group select-none shrink-0 min-w-0">
         <img src="logo.png" 
@@ -81,7 +81,7 @@
   </header>
 
   <!-- 主体容器 -->
-  <main class="max-w-2xl w-full mx-auto p-4 sm:p-6 my-auto">
+  <main class="max-w-2xl w-full mx-auto px-4 sm:px-6 py-4 sm:py-6 my-auto">
 
     <!-- 表单卡片（配置服务器信息窗口，50%透明度 + 毛玻璃滤镜） -->
     <div id="card-form" class="bg-black/50 backdrop-blur-md rounded-3xl p-5 sm:p-8 shadow-2xl border border-white/10 transition-all duration-300 overflow-hidden">
