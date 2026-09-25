@@ -5,6 +5,15 @@
 
 ---
 
+## 📸 界面预览与操作流程
+
+| 1. 配置服务器信息 | 2. 自动化端侧部署 | 3. 一键扫码连接 |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/01-config.png" width="260" alt="步骤 1：配置服务器信息" /> | <img src="docs/screenshots/02-deploy.png" width="260" alt="步骤 2：自动化端侧部署" /> | <img src="docs/screenshots/03-result.jpg" width="260" alt="步骤 3：一键扫码连接" /> |
+| **填写 VPS 密码凭证**<br>零配置开箱即用，支持密码/私钥 | **端侧 WASM 直连 SSH**<br>实时流式输出日志，40~90秒完成 | **生成 VLESS 节点**<br>即时生成二维码与节点 URI 链接 |
+
+---
+
 ## 🛡️ 重点中的重点：零知识隐私安全架构 (Zero-Knowledge Architecture)
 
 很多小白用户不敢在第三方网站输入服务器密码，本项目的核心优势在于**彻底消除了中心化服务器窃取凭证的可能**：
@@ -39,6 +48,8 @@
 
 ```tree
 1click2VPN/
+├── docs/                   # 项目文档与效果截图
+│   └── screenshots/        # 交互演示截图
 ├── public/                 # 静态前端资源（直接部署到 Cloudflare Pages）
 │   ├── index.html          # 现代化交互界面 (Tailwind CSS)
 │   ├── app.js              # 前端调度与状态机控制逻辑
