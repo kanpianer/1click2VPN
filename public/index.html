@@ -44,7 +44,14 @@
     }
   </style>
 </head>
-<body class="bg-[#0e1015] text-zinc-100 antialiased min-h-screen flex flex-col justify-between selection:bg-white selection:text-black w-full max-w-full overflow-x-hidden">
+<body class="bg-[#0e1015] text-zinc-100 antialiased min-h-screen flex flex-col justify-between selection:bg-white selection:text-black w-full max-w-full overflow-x-hidden relative">
+
+  <!-- 全屏背景图片与半透明遮罩 (覆盖整个网页包括导航栏与页脚) -->
+  <div class="fixed inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden="true">
+    <img src="bg.jpg" alt="" loading="eager" decoding="async" class="w-full h-full object-cover object-center opacity-50 select-none">
+    <!-- 半透明遮罩层 -->
+    <div class="absolute inset-0 bg-black/40"></div>
+  </div>
 
   <!-- 顶部导航（50%透明度 + 毛玻璃滤镜） -->
   <header class="w-full max-w-full bg-black/50 backdrop-blur-md border-b border-white/10 py-3 sticky top-0 z-30 shadow-sm">
@@ -81,7 +88,7 @@
   </header>
 
   <!-- 主体容器 -->
-  <main class="max-w-2xl w-full mx-auto px-4 sm:px-6 py-4 sm:py-6 my-auto">
+  <main class="max-w-2xl w-full mx-auto px-4 sm:px-6 py-4 sm:py-6 my-auto relative z-10">
 
     <!-- 表单卡片（配置服务器信息窗口，50%透明度 + 毛玻璃滤镜） -->
     <div id="card-form" class="bg-black/50 backdrop-blur-md rounded-3xl p-5 sm:p-8 shadow-2xl border border-white/10 transition-all duration-300 overflow-hidden">
@@ -357,7 +364,7 @@
   </main>
 
   <!-- 页脚 (50%透明度 + 毛玻璃效果) -->
-  <footer class="w-full max-w-full text-center py-4 px-4 sm:px-6 text-xs text-zinc-400 bg-black/50 backdrop-blur-md border-t border-white/10">
+  <footer class="w-full max-w-full text-center py-4 px-4 sm:px-6 text-xs text-zinc-400 bg-black/50 backdrop-blur-md border-t border-white/10 relative z-10">
     <p class="max-w-xl mx-auto leading-relaxed">Made with ❤️ <a href="https://github.com/kanpianer/1click2VPN" target="_blank" rel="noopener noreferrer" class="underline font-semibold hover:text-white text-zinc-100 transition-colors">Github</a> 项目开源，您输入的信息不会上传到后端数据库。</p>
   </footer>
 
