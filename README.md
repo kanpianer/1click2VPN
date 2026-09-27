@@ -1,4 +1,4 @@
-# 🖕 一贱建节点 - 纯前端零知识 VPS 节点一键搭建工具
+# 🖕 一贱建节点 - 网页端 VPS 节点一键搭建 SSH 工具
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
