@@ -9,6 +9,7 @@ import (
 	"io"
 	"regexp"
 	"strings"
+	"sync"
 	"syscall/js"
 	"time"
 
@@ -22,6 +23,7 @@ func main() {
 
 	// 注册全局 JavaScript 导出函数
 	js.Global().Set("vpn2qrDeploy", js.FuncOf(vpn2qrDeploy))
+	js.Global().Set("vpn2qrInteractiveSession", js.FuncOf(vpn2qrInteractiveSession))
 	fmt.Println("[WASM] vpn2qr zero-knowledge SSH engine initialized.")
 
 	<-c
@@ -251,4 +253,323 @@ func vpn2qrDeploy(this js.Value, args []js.Value) any {
 	}()
 
 	return nil
+}
+
+// vpn2qrInteractiveSession 启动全功能伪终端 (PTY) 交互式 SSH 会话
+// 参数由 JavaScript 传入:
+// options: {
+//   wsUrl: "wss://...",
+//   user: "root",
+//   password: "...",
+//   privateKey: "...",
+//   cols: 80,
+//   rows: 24,
+//   cmd: "sh -c ..." // 可选，启动后自动执行的脚本指令
+// }
+// callbacks: {
+//   onStatus: func(status string),
+//   onData: func(data string),
+//   onClose: func(),
+//   onError: func(errMsg string)
+// }
+// 返回操作控制器对象: {
+//   send: func(data string),
+//   resize: func(cols int, rows int),
+//   close: func()
+// }
+func vpn2qrInteractiveSession(this js.Value, args []js.Value) any {
+	if len(args) < 2 {
+		fmt.Println("[WASM] Insufficient arguments for vpn2qrInteractiveSession")
+		return nil
+	}
+
+	opts := args[0]
+	cb := args[1]
+
+	onStatus := cb.Get("onStatus")
+	onData := cb.Get("onData")
+	onClose := cb.Get("onClose")
+	onError := cb.Get("onError")
+
+	reportStatus := func(msg string) {
+		if !onStatus.IsUndefined() && !onStatus.IsNull() {
+			onStatus.Invoke(msg)
+		}
+	}
+	reportData := func(chunk string) {
+		if !onData.IsUndefined() && !onData.IsNull() {
+			onData.Invoke(chunk)
+		}
+	}
+	reportClose := func() {
+		if !onClose.IsUndefined() && !onClose.IsNull() {
+			onClose.Invoke()
+		}
+	}
+	reportError := func(err string) {
+		if !onError.IsUndefined() && !onError.IsNull() {
+			onError.Invoke(err)
+		}
+	}
+
+	wsUrl := opts.Get("wsUrl").String()
+	user := opts.Get("user").String()
+	password := opts.Get("password").String()
+	privateKey := opts.Get("privateKey").String()
+	cmd := ""
+	if !opts.Get("cmd").IsUndefined() && !opts.Get("cmd").IsNull() {
+		cmd = opts.Get("cmd").String()
+	}
+	cols := 80
+	if !opts.Get("cols").IsUndefined() && !opts.Get("cols").IsNull() && opts.Get("cols").Int() > 0 {
+		cols = opts.Get("cols").Int()
+	}
+	rows := 24
+	if !opts.Get("rows").IsUndefined() && !opts.Get("rows").IsNull() && opts.Get("rows").Int() > 0 {
+		rows = opts.Get("rows").Int()
+	}
+
+	if user == "" {
+		user = "root"
+	}
+
+	writeCh := make(chan []byte, 1024)
+	doneCh := make(chan struct{})
+	var closeOnce sync.Once
+
+	var currentSession *ssh.Session
+	var sessionMu sync.Mutex
+	var netConn *wsConn
+	var client *ssh.Client
+
+	cleanup := func() {
+		closeOnce.Do(func() {
+			close(doneCh)
+			sessionMu.Lock()
+			if currentSession != nil {
+				_ = currentSession.Close()
+			}
+			if client != nil {
+				_ = client.Close()
+			}
+			if netConn != nil {
+				_ = netConn.Close()
+			}
+			sessionMu.Unlock()
+			reportClose()
+		})
+	}
+
+	// 暴露给 JS 的控制器对象
+	controller := js.Global().Get("Object").New()
+
+	sendFn := js.FuncOf(func(this js.Value, args []js.Value) any {
+		if len(args) == 0 {
+			return nil
+		}
+		data := args[0].String()
+		select {
+		case <-doneCh:
+			return nil
+		default:
+			select {
+			case writeCh <- []byte(data):
+			default:
+			}
+		}
+		return nil
+	})
+
+	resizeFn := js.FuncOf(func(this js.Value, args []js.Value) any {
+		if len(args) < 2 {
+			return nil
+		}
+		newCols := args[0].Int()
+		newRows := args[1].Int()
+		sessionMu.Lock()
+		if currentSession != nil {
+			_ = currentSession.WindowChange(newRows, newCols)
+		}
+		sessionMu.Unlock()
+		return nil
+	})
+
+	closeFn := js.FuncOf(func(this js.Value, args []js.Value) any {
+		cleanup()
+		return nil
+	})
+
+	controller.Set("send", sendFn)
+	controller.Set("resize", resizeFn)
+	controller.Set("close", closeFn)
+
+	go func() {
+		reportStatus("正在通过安全隧道连接服务器...")
+
+		ws := js.Global().Get("WebSocket").New(wsUrl)
+		netConn = newWSConn(ws)
+
+		wsOpenCh := make(chan bool, 1)
+		onOpen := js.FuncOf(func(this js.Value, args []js.Value) any {
+			wsOpenCh <- true
+			return nil
+		})
+		wsErrCh := make(chan string, 1)
+		onWsError := js.FuncOf(func(this js.Value, args []js.Value) any {
+			wsErrCh <- "WebSocket 连接失败"
+			return nil
+		})
+		ws.Set("onopen", onOpen)
+		ws.Set("onerror", onWsError)
+
+		select {
+		case <-wsOpenCh:
+			reportStatus("WebSocket 隧道建立成功，正在进行 SSH 握手...")
+		case errStr := <-wsErrCh:
+			reportError(errStr)
+			cleanup()
+			return
+		case <-time.After(15 * time.Second):
+			reportError("连接中继超时，请检查网络或 VPS IP")
+			cleanup()
+			return
+		case <-doneCh:
+			cleanup()
+			return
+		}
+
+		var authMethods []ssh.AuthMethod
+		if privateKey != "" {
+			signer, err := ssh.ParsePrivateKey([]byte(privateKey))
+			if err != nil {
+				reportError("私钥格式解析失败: " + err.Error())
+				cleanup()
+				return
+			}
+			authMethods = append(authMethods, ssh.PublicKeys(signer))
+		} else if password != "" {
+			authMethods = append(authMethods, ssh.Password(password))
+		} else {
+			reportError("请提供 VPS 的 root 密码或 SSH 私钥")
+			cleanup()
+			return
+		}
+
+		sshConfig := &ssh.ClientConfig{
+			User:            user,
+			Auth:            authMethods,
+			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+			Timeout:         20 * time.Second,
+		}
+
+		reportStatus("正在验证 SSH 身份凭证...")
+		sshConn, chans, reqs, err := ssh.NewClientConn(netConn, "vps:22", sshConfig)
+		if err != nil {
+			reportError("SSH 认证失败: " + err.Error())
+			cleanup()
+			return
+		}
+
+		sessionMu.Lock()
+		client = ssh.NewClient(sshConn, chans, reqs)
+		session, err := client.NewSession()
+		if err != nil {
+			sessionMu.Unlock()
+			reportError("开启 SSH 会话失败: " + err.Error())
+			cleanup()
+			return
+		}
+		currentSession = session
+		sessionMu.Unlock()
+
+		modes := ssh.TerminalModes{
+			ssh.ECHO:          1,
+			ssh.TTY_OP_ISPEED: 14400,
+			ssh.TTY_OP_OSPEED: 14400,
+		}
+		if err := session.RequestPty("xterm-256color", rows, cols, modes); err != nil {
+			reportError("分配伪终端 (PTY) 失败: " + err.Error())
+			cleanup()
+			return
+		}
+
+		stdinPipe, err := session.StdinPipe()
+		if err != nil {
+			reportError("绑定输入流失败: " + err.Error())
+			cleanup()
+			return
+		}
+
+		stdoutPipe, err := session.StdoutPipe()
+		if err != nil {
+			reportError("绑定输出流失败: " + err.Error())
+			cleanup()
+			return
+		}
+
+		stderrPipe, err := session.StderrPipe()
+		if err != nil {
+			reportError("绑定错误输出流失败: " + err.Error())
+			cleanup()
+			return
+		}
+
+		if err := session.Shell(); err != nil {
+			reportError("启动 Shell 失败: " + err.Error())
+			cleanup()
+			return
+		}
+
+		reportStatus("connected")
+
+		// 启动 goroutine 将 writeCh 数据写入 stdinPipe
+		go func() {
+			for {
+				select {
+				case <-doneCh:
+					return
+				case data, ok := <-writeCh:
+					if !ok {
+						return
+					}
+					if _, err := stdinPipe.Write(data); err != nil {
+						return
+					}
+				}
+			}
+		}()
+
+		// 如果指定了初始命令，稍等 shell 就绪后自动灌入执行
+		if cmd != "" {
+			go func() {
+				time.Sleep(300 * time.Millisecond)
+				select {
+				case <-doneCh:
+					return
+				case writeCh <- []byte(cmd + "\n"):
+				}
+			}()
+		}
+
+		// 合并读取 stdout 和 stderr 实时输出
+		multiReader := io.MultiReader(stdoutPipe, stderrPipe)
+		go func() {
+			buf := make([]byte, 4096)
+			for {
+				n, err := multiReader.Read(buf)
+				if n > 0 {
+					reportData(string(buf[:n]))
+				}
+				if err != nil {
+					break
+				}
+			}
+			cleanup()
+		}()
+
+		_ = session.Wait()
+		cleanup()
+	}()
+
+	return controller
 }

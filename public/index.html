@@ -20,6 +20,10 @@
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.4/dist/confetti.browser.min.js"></script>
   <!-- Go WebAssembly 运行时桥接 -->
   <script src="wasm_exec.js"></script>
+  <!-- xterm.js (浏览器端交互式模拟终端引擎与自适应插件) -->
+  <link rel="stylesheet" href="libs/xterm/xterm.css">
+  <script src="libs/xterm/xterm.min.js"></script>
+  <script src="libs/xterm/xterm-addon-fit.min.js"></script>
   <style>
     html, body {
       overflow-x: hidden;
@@ -91,10 +95,73 @@
   <main class="max-w-2xl w-full mx-auto px-4 sm:px-6 py-4 sm:py-6 my-auto relative z-10">
 
     <!-- 表单卡片（配置服务器信息窗口，50%透明度 + 毛玻璃滤镜） -->
-    <div id="card-form" class="bg-black/50 backdrop-blur-md rounded-3xl p-5 sm:p-8 shadow-2xl border border-white/10 transition-all duration-300 overflow-hidden">
-      <div class="mb-6">
-        <h2 class="text-xl font-bold text-white">配置服务器信息</h2>
-        <p class="text-xs text-zinc-400 mt-1">请输入您购买的 VPS 远程连接凭证（通常在 VPS 后台或开通邮件中）</p>
+    <div id="card-form" class="bg-black/50 backdrop-blur-md rounded-3xl p-5 sm:p-8 shadow-2xl border border-white/10 transition-all duration-300 relative">
+      <div class="mb-6 flex items-start justify-between relative">
+        <div class="min-w-0 pr-3">
+          <div class="flex items-center space-x-2 flex-wrap">
+            <h2 class="text-xl font-bold text-white">配置服务器信息</h2>
+            <span id="active-script-badge" class="hidden text-[11px] px-2 py-0.5 rounded-full bg-white/10 text-zinc-200 border border-white/20 font-medium">
+              默认: Reality
+            </span>
+          </div>
+          <p class="text-xs text-zinc-400 mt-1">请输入您购买的 VPS 远程连接凭证（通常在 VPS 后台或开通邮件中）</p>
+        </div>
+
+        <!-- 右上角 脚本 图标与下拉菜单 -->
+        <div class="relative shrink-0" id="script-menu-container">
+          <button id="btn-script-menu" type="button" onclick="toggleScriptMenu(event)" 
+                  title="选择搭建脚本 (支持 Snell / 八合一交互式脚本)"
+                  class="p-2 sm:p-2.5 rounded-xl text-white hover:bg-white/10 active:bg-white/20 transition-all flex items-center justify-center border border-white/15 hover:border-white/40 cursor-pointer shadow-sm group">
+            <!-- 纯白脚本图标 (从 SVG 提取) -->
+            <svg class="w-5 h-5 text-white transition-transform group-hover:scale-105" viewBox="0 0 64 64" fill="white" xmlns="http://www.w3.org/2000/svg">
+              <path d="M38.147,56.256c3.68,-0.818 6.451,-2.165 8.312,-4.039c1.861,-1.874 2.791,-4.35 2.791,-7.428l0,-4.886c0,-3.978 2.204,-5.967 6.612,-5.967l0,-3.56c-4.408,0 -6.612,-1.981 -6.612,-5.942l0,-5.108c-0.041,-2.995 -0.972,-5.414 -2.791,-7.256c-1.82,-1.841 -4.59,-3.179 -8.312,-4.014l-1.186,2.824c4.346,1.096 6.519,3.953 6.519,8.569l0,4.96c0,3.716 1.736,6.302 5.209,7.759c-3.473,1.474 -5.209,4.084 -5.209,7.833l0,5.058c-0.062,4.502 -2.235,7.293 -6.519,8.373l1.186,2.824Zm-12.44,-0.025c-3.679,-0.818 -6.448,-2.164 -8.308,-4.037c-1.86,-1.873 -2.79,-4.348 -2.79,-7.424l0,-4.884c0,-3.975 -2.203,-5.963 -6.609,-5.963l0,-3.559c4.406,0 6.609,-1.979 6.609,-5.939l0,-5.105c0.041,-2.994 0.971,-5.411 2.79,-7.252c1.818,-1.84 4.587,-3.178 8.308,-4.012l1.184,2.822c-4.343,1.096 -6.515,3.951 -6.515,8.565l0,4.958c0,3.714 -1.735,6.299 -5.206,7.755c3.471,1.472 5.206,4.082 5.206,7.829l0,5.055c0.062,4.5 2.234,7.289 6.515,8.369l-1.184,2.822Z"/>
+            </svg>
+          </button>
+
+          <!-- 脚本选择下拉菜单 -->
+          <div id="script-dropdown" class="hidden absolute right-0 top-full mt-2 w-72 sm:w-80 bg-zinc-900/95 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl p-2 z-50 space-y-1 text-xs">
+            <div class="px-2.5 py-1 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider flex items-center justify-between border-b border-white/10 pb-1.5 mb-1">
+              <span>选择搭建脚本</span>
+              <span class="text-[10px] text-zinc-500 font-normal">点击切换模式</span>
+            </div>
+
+            <!-- 默认：内置 VLESS-Reality -->
+            <button type="button" onclick="selectScript('builtin')" class="script-option w-full text-left p-2.5 rounded-xl hover:bg-white/10 transition-colors flex items-start space-x-3 group" data-script="builtin">
+              <span class="text-base mt-0.5">⚡</span>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-white group-hover:text-white">内置 VLESS-Reality</span>
+                  <span class="text-[10px] px-1.5 py-0.5 rounded bg-white text-black font-bold">全自动</span>
+                </div>
+                <p class="text-[11px] text-zinc-400 mt-0.5">零知识端侧自动部署，直接生成二维码</p>
+              </div>
+            </button>
+
+            <!-- 脚本 1: Snell 一键脚本 -->
+            <button type="button" onclick="selectScript('snell')" class="script-option w-full text-left p-2.5 rounded-xl hover:bg-white/10 transition-colors flex items-start space-x-3 group" data-script="snell">
+              <span class="text-base mt-0.5">📜</span>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-zinc-200 group-hover:text-white">Snell 一键脚本</span>
+                  <span class="text-[10px] px-1.5 py-0.5 rounded bg-white/20 text-white font-medium">交互式</span>
+                </div>
+                <p class="text-[11px] text-zinc-400 mt-0.5 truncate font-mono">sh -c "$(curl -fsSL https://install.jinqians.com)"</p>
+              </div>
+            </button>
+
+            <!-- 脚本 2: 八合一一键脚本 -->
+            <button type="button" onclick="selectScript('v2ray-agent')" class="script-option w-full text-left p-2.5 rounded-xl hover:bg-white/10 transition-colors flex items-start space-x-3 group" data-script="v2ray-agent">
+              <span class="text-base mt-0.5">📦</span>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-zinc-200 group-hover:text-white">八合一一键脚本</span>
+                  <span class="text-[10px] px-1.5 py-0.5 rounded bg-white/20 text-white font-medium">交互式</span>
+                </div>
+                <p class="text-[11px] text-zinc-400 mt-0.5 truncate font-mono">mack-a/v2ray-agent 强大聚合脚本</p>
+              </div>
+            </button>
+          </div>
+        </div>
       </div>
 
       <form id="deploy-form" onsubmit="event.preventDefault(); handleDeploy();" class="space-y-4">
@@ -211,9 +278,9 @@
 
         <!-- 提交按钮 -->
         <button id="btn-submit" type="submit" 
-                class="w-full py-3.5 bg-white hover:bg-zinc-200 active:bg-zinc-300 text-black font-bold rounded-xl transition duration-150 flex items-center justify-center space-x-2 shadow-lg shadow-white/5">
+                class="w-full py-3.5 bg-white hover:bg-zinc-200 active:bg-zinc-300 text-black font-bold rounded-xl transition duration-150 flex items-center justify-center space-x-2 shadow-lg shadow-white/5 cursor-pointer">
           <img src="logo.png" alt="一贱建节点" class="w-5 h-5 object-contain inline-block invert">
-          <span>一键搭建节点并生成二维码</span>
+          <span id="btn-submit-text">一键搭建节点并生成二维码</span>
         </button>
 
         <!-- 表单窗口底部隐私保障提示 -->
@@ -333,6 +400,63 @@
         <button onclick="returnToForm()" class="w-full py-2 text-zinc-400 hover:text-zinc-200 text-xs transition">
           ✏️ 返回修改 IP 或密码
         </button>
+      </div>
+    </div>
+
+    <!-- 交互式模拟终端卡片 (选择自定义脚本时使用，50%透明度 + 毛玻璃滤镜) -->
+    <div id="card-terminal" class="hidden bg-black/50 backdrop-blur-md rounded-3xl p-4 sm:p-6 shadow-2xl border border-white/10 space-y-4 text-zinc-100 overflow-hidden transition-all duration-300">
+      <!-- 终端顶部状态栏 -->
+      <div class="flex items-center justify-between pb-3 border-b border-white/10 flex-wrap gap-2">
+        <div class="flex items-center space-x-3 min-w-0">
+          <!-- 拟态窗口小圆点 -->
+          <div class="flex items-center space-x-1.5 shrink-0">
+            <span class="w-3 h-3 rounded-full bg-red-500/80 inline-block"></span>
+            <span class="w-3 h-3 rounded-full bg-yellow-500/80 inline-block"></span>
+            <span class="w-3 h-3 rounded-full bg-emerald-500/80 inline-block"></span>
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center space-x-2 flex-wrap">
+              <span id="terminal-session-title" class="font-mono text-xs sm:text-sm font-bold text-white truncate">root@vps · 模拟终端</span>
+              <span id="terminal-status-pill" class="text-[10px] px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 border border-yellow-500/30">正在连接...</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-2 shrink-0">
+          <button type="button" onclick="clearInteractiveTerminal()" class="px-2.5 py-1 text-[11px] text-zinc-300 hover:text-white bg-white/10 hover:bg-white/20 active:bg-white/30 rounded-lg transition-colors border border-white/10 cursor-pointer">清屏</button>
+          <button type="button" onclick="closeInteractiveTerminal()" class="px-2.5 py-1 text-[11px] text-zinc-300 hover:text-white bg-white/10 hover:bg-white/20 active:bg-white/30 rounded-lg transition-colors border border-white/10 cursor-pointer">返回设置 ✕</button>
+        </div>
+      </div>
+
+      <!-- 终端渲染视口 -->
+      <div class="relative rounded-2xl overflow-hidden border border-white/10 bg-[#09090b]">
+        <div id="xterm-container" class="h-80 sm:h-96 w-full p-2.5"></div>
+      </div>
+
+      <!-- 快捷操作键栏 (针对手机和移动端特别优化) -->
+      <div class="space-y-1.5 pt-1">
+        <div class="flex items-center justify-between text-[11px] text-zinc-400">
+          <span class="flex items-center space-x-1">
+            <span>⌨️ 快捷辅助按键</span>
+            <span class="text-zinc-500">(手机端可直接点按)</span>
+          </span>
+          <span class="text-zinc-500 text-[10px]">直接键盘输入或点按辅助键</span>
+        </div>
+        <div class="flex flex-wrap gap-1.5 select-none font-mono text-xs">
+          <button type="button" onclick="terminalSendInput('\r')" class="px-3 py-1.5 bg-white text-black font-bold rounded-lg hover:bg-zinc-200 active:scale-95 transition-all shadow cursor-pointer">回车 ↵</button>
+          <button type="button" onclick="terminalSendInput('1')" class="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-lg transition border border-white/10 cursor-pointer">1</button>
+          <button type="button" onclick="terminalSendInput('2')" class="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-lg transition border border-white/10 cursor-pointer">2</button>
+          <button type="button" onclick="terminalSendInput('3')" class="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-lg transition border border-white/10 cursor-pointer">3</button>
+          <button type="button" onclick="terminalSendInput('4')" class="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-lg transition border border-white/10 cursor-pointer">4</button>
+          <button type="button" onclick="terminalSendInput('0')" class="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-lg transition border border-white/10 cursor-pointer">0</button>
+          <button type="button" onclick="terminalSendInput('y')" class="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-lg transition border border-white/10 cursor-pointer">y</button>
+          <button type="button" onclick="terminalSendInput('n')" class="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-lg transition border border-white/10 cursor-pointer">n</button>
+          <button type="button" onclick="terminalSendInput('\x03')" class="px-2.5 py-1.5 bg-red-500/20 hover:bg-red-500/30 active:scale-95 text-red-200 rounded-lg transition border border-red-500/30 cursor-pointer">Ctrl+C 中断</button>
+          <button type="button" onclick="terminalSendInput('\t')" class="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-lg transition border border-white/10 cursor-pointer">Tab</button>
+          <button type="button" onclick="terminalSendInput(' ')" class="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-lg transition border border-white/10 cursor-pointer">空格</button>
+          <button type="button" onclick="terminalSendInput('\x1b[A')" class="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-lg transition border border-white/10 cursor-pointer">↑</button>
+          <button type="button" onclick="terminalSendInput('\x1b[B')" class="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-lg transition border border-white/10 cursor-pointer">↓</button>
+        </div>
       </div>
     </div>
 

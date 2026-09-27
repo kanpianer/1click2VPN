@@ -7,6 +7,91 @@ let wasmLoaded = false;
 let authMode = 'password'; // 'password' | 'key'
 let currentVlessUrl = '';
 
+// 第三方节点搭建脚本定义
+const SCRIPT_DEFS = {
+  builtin: {
+    name: '内置 VLESS-Reality',
+    badge: '默认: Reality',
+    btnText: '一键搭建节点并生成二维码',
+    interactive: false,
+    cmd: ''
+  },
+  snell: {
+    name: 'Snell 一键脚本',
+    badge: '已选: Snell 脚本',
+    btnText: '配置并搭建节点',
+    interactive: true,
+    cmd: 'sh -c "$(curl -fsSL https://install.jinqians.com)"'
+  },
+  'v2ray-agent': {
+    name: '八合一一键脚本',
+    badge: '已选: 八合一脚本',
+    btnText: '配置并搭建节点',
+    interactive: true,
+    cmd: 'wget -P /root -N --no-check-certificate "https://raw.githubusercontent.com/mack-a/v2ray-agent/master/install.sh" && chmod 700 /root/install.sh && /root/install.sh'
+  }
+};
+let currentScriptKey = 'builtin';
+
+// 交互式终端状态句柄
+let activeTerminalSession = null;
+let activeXterm = null;
+let activeFitAddon = null;
+
+// 切换脚本下拉菜单
+function toggleScriptMenu(e) {
+  if (e) e.stopPropagation();
+  const dropdown = document.getElementById('script-dropdown');
+  if (!dropdown) return;
+  dropdown.classList.toggle('hidden');
+}
+
+// 选择特定脚本模式
+function selectScript(key) {
+  if (!SCRIPT_DEFS[key]) return;
+  currentScriptKey = key;
+  const def = SCRIPT_DEFS[key];
+
+  // 更新卡片顶部激活标签
+  const badge = document.getElementById('active-script-badge');
+  if (badge) {
+    if (key === 'builtin') {
+      badge.classList.add('hidden');
+    } else {
+      badge.classList.remove('hidden');
+      badge.textContent = def.badge;
+    }
+  }
+
+  // 动态更新主操作按钮文案
+  const btnTextEl = document.getElementById('btn-submit-text');
+  if (btnTextEl) {
+    btnTextEl.textContent = def.btnText;
+  }
+
+  // 高亮选中的选项项
+  document.querySelectorAll('.script-option').forEach(btn => {
+    const scriptAttr = btn.getAttribute('data-script');
+    if (scriptAttr === key) {
+      btn.classList.add('bg-white/15');
+    } else {
+      btn.classList.remove('bg-white/15');
+    }
+  });
+
+  // 关闭下拉菜单
+  document.getElementById('script-dropdown')?.classList.add('hidden');
+}
+
+// 点击外部区域关闭下拉菜单
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('script-menu-container');
+  const dropdown = document.getElementById('script-dropdown');
+  if (menu && dropdown && !menu.contains(e.target)) {
+    dropdown.classList.add('hidden');
+  }
+});
+
 // 初始化 Go WebAssembly 运行时
 async function initWasm() {
   if (wasmLoaded) return;
@@ -182,6 +267,12 @@ async function handleDeploy() {
     }
   }
 
+  // 检查是否选择了交互式第三方脚本 (Snell / 八合一等)
+  if (currentScriptKey !== 'builtin' && SCRIPT_DEFS[currentScriptKey]?.interactive) {
+    await executeInteractiveTerminal(currentScriptKey);
+    return;
+  }
+
   await executeDeploy(false);
 }
 
@@ -267,6 +358,216 @@ async function executeDeploy(quickMode = false) {
       showDiagnosticCard(errMsg);
     }
   );
+}
+
+// 执行交互式模拟终端会话 (Snell / 八合一等)
+async function executeInteractiveTerminal(scriptKey) {
+  const host = document.getElementById('vps-host').value.trim();
+  const port = parseInt(document.getElementById('vps-port').value.trim() || '22', 10);
+  const user = document.getElementById('vps-user').value.trim() || 'root';
+  const password = document.getElementById('vps-password').value;
+  const privateKey = document.getElementById('vps-key').value;
+
+  const def = SCRIPT_DEFS[scriptKey];
+  if (!def) return;
+
+  const DEFAULT_WORKER_RELAY = 'vpn2qr-relay.qstizi.workers.dev';
+  let workerDomain = document.getElementById('adv-worker')?.value.trim() || DEFAULT_WORKER_RELAY;
+
+  let wsUrl = '';
+  if (workerDomain) {
+    workerDomain = workerDomain.replace(/^https?:\/\//, '').replace(/^wss?:\/\//, '').replace(/\/+$/, '');
+    wsUrl = `wss://${workerDomain}/ws?host=${encodeURIComponent(host)}&port=${port}`;
+  } else {
+    const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    wsUrl = `${wsProto}//${window.location.host}/ws?host=${encodeURIComponent(host)}&port=${port}`;
+  }
+
+  // 隐藏其他卡片，展示模拟终端卡片
+  document.getElementById('card-form').classList.add('hidden');
+  document.getElementById('card-diagnostic').classList.add('hidden');
+  document.getElementById('card-progress').classList.add('hidden');
+  document.getElementById('card-result').classList.add('hidden');
+  document.getElementById('card-terminal').classList.remove('hidden');
+
+  const privacyBanner = document.getElementById('banner-privacy');
+  if (privacyBanner) privacyBanner.classList.add('hidden');
+
+  // 更新终端标题与状态
+  const titleEl = document.getElementById('terminal-session-title');
+  if (titleEl) {
+    titleEl.textContent = `${user}@${host} · ${def.name}`;
+  }
+  const pillEl = document.getElementById('terminal-status-pill');
+  if (pillEl) {
+    pillEl.className = 'text-[10px] px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 border border-yellow-500/30';
+    pillEl.textContent = '正在连接...';
+  }
+
+  // 清理现有会话与终端
+  if (activeTerminalSession) {
+    try { activeTerminalSession.close(); } catch (e) {}
+    activeTerminalSession = null;
+  }
+  if (activeXterm) {
+    try { activeXterm.dispose(); } catch (e) {}
+    activeXterm = null;
+  }
+
+  const container = document.getElementById('xterm-container');
+  container.innerHTML = '';
+
+  if (typeof Terminal === 'undefined') {
+    container.innerHTML = '<div class="text-red-400 p-4 text-xs font-mono">xterm.js 终端组件未能成功载入，请检查网络或刷新重试</div>';
+    return;
+  }
+
+  const term = new Terminal({
+    theme: {
+      background: '#09090b',
+      foreground: '#f4f4f5',
+      cursor: '#ffffff',
+      cursorAccent: '#09090b',
+      selectionBackground: 'rgba(255, 255, 255, 0.25)',
+      black: '#27272a',
+      red: '#ef4444',
+      green: '#10b981',
+      yellow: '#f59e0b',
+      blue: '#3b82f6',
+      magenta: '#d946ef',
+      cyan: '#06b6d4',
+      white: '#fafafa',
+      brightBlack: '#71717a',
+      brightRed: '#f87171',
+      brightGreen: '#34d399',
+      brightYellow: '#fbbf24',
+      brightBlue: '#60a5fa',
+      brightMagenta: '#e879f9',
+      brightCyan: '#22d3ee',
+      brightWhite: '#ffffff'
+    },
+    cursorBlink: true,
+    fontSize: 13,
+    fontFamily: "'LXGW WenKai Mono', 'LXGW WenKai Mono TC', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+    lineHeight: 1.25,
+    convertEol: true,
+    scrollback: 5000
+  });
+
+  const fitAddon = new FitAddon.FitAddon();
+  term.loadAddon(fitAddon);
+  term.open(container);
+
+  setTimeout(() => {
+    try { fitAddon.fit(); } catch (e) {}
+  }, 100);
+
+  activeXterm = term;
+  activeFitAddon = fitAddon;
+
+  term.writeln('\x1b[37;1m==> 正在建立端到端加密 WebSocket 盲中继通道...\x1b[0m');
+  term.writeln(`\x1b[90m目标节点: ${host}:${port} | 预执行指令: ${def.cmd}\x1b[0m\r\n`);
+
+  term.onData(data => {
+    if (activeTerminalSession && typeof activeTerminalSession.send === 'function') {
+      activeTerminalSession.send(data);
+    }
+  });
+
+  term.onResize(size => {
+    if (activeTerminalSession && typeof activeTerminalSession.resize === 'function') {
+      activeTerminalSession.resize(size.cols, size.rows);
+    }
+  });
+
+  window.addEventListener('resize', handleTerminalWindowResize);
+
+  activeTerminalSession = window.vpn2qrInteractiveSession({
+    wsUrl: wsUrl,
+    user: user,
+    password: authMode === 'password' ? password : '',
+    privateKey: authMode === 'key' ? privateKey : '',
+    cols: term.cols || 80,
+    rows: term.rows || 24,
+    cmd: def.cmd
+  }, {
+    onStatus: (status) => {
+      const pill = document.getElementById('terminal-status-pill');
+      if (!pill) return;
+      if (status === 'connected') {
+        pill.className = 'text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+        pill.textContent = '🟢 终端已连接';
+        term.focus();
+      } else {
+        pill.className = 'text-[10px] px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 border border-yellow-500/30';
+        pill.textContent = status;
+      }
+    },
+    onData: (data) => {
+      term.write(data);
+    },
+    onClose: () => {
+      const pill = document.getElementById('terminal-status-pill');
+      if (pill) {
+        pill.className = 'text-[10px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30';
+        pill.textContent = '🔴 会话已结束';
+      }
+      term.writeln('\r\n\x1b[90m--------------------------------------------------\x1b[0m');
+      term.writeln('\x1b[33m[远程会话已退出，点击右上角“返回设置”回到配置页面]\x1b[0m');
+    },
+    onError: (err) => {
+      const pill = document.getElementById('terminal-status-pill');
+      if (pill) {
+        pill.className = 'text-[10px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30';
+        pill.textContent = '🔴 连接错误';
+      }
+      term.writeln(`\r\n\x1b[31;1m[连接发生错误: ${err}]\x1b[0m`);
+    }
+  });
+}
+
+function handleTerminalWindowResize() {
+  if (activeFitAddon && activeXterm && !document.getElementById('card-terminal').classList.contains('hidden')) {
+    try {
+      activeFitAddon.fit();
+    } catch (e) {}
+  }
+}
+
+// 终端辅助按键输入
+function terminalSendInput(data) {
+  if (activeTerminalSession && typeof activeTerminalSession.send === 'function') {
+    activeTerminalSession.send(data);
+  }
+  if (activeXterm) {
+    activeXterm.focus();
+  }
+}
+
+// 清屏
+function clearInteractiveTerminal() {
+  if (activeXterm) {
+    activeXterm.clear();
+    activeXterm.focus();
+  }
+}
+
+// 关闭交互终端返回表单
+function closeInteractiveTerminal() {
+  window.removeEventListener('resize', handleTerminalWindowResize);
+  if (activeTerminalSession) {
+    try { activeTerminalSession.close(); } catch (e) {}
+    activeTerminalSession = null;
+  }
+  if (activeXterm) {
+    try { activeXterm.dispose(); } catch (e) {}
+    activeXterm = null;
+  }
+  document.getElementById('card-terminal')?.classList.add('hidden');
+  document.getElementById('card-form')?.classList.remove('hidden');
+  const privacyBanner = document.getElementById('banner-privacy');
+  if (privacyBanner) privacyBanner.classList.remove('hidden');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 // 智能诊断分析与卡片展示
@@ -484,9 +785,13 @@ function downloadQRCode() {
 
 // 重置并回到主页 (点击 LOGO 触发)
 function resetApp() {
+  closeInteractiveTerminal();
+  selectScript('builtin');
+
   document.getElementById('card-result')?.classList.add('hidden');
   document.getElementById('card-diagnostic')?.classList.add('hidden');
   document.getElementById('card-progress')?.classList.add('hidden');
+  document.getElementById('card-terminal')?.classList.add('hidden');
   document.getElementById('card-form')?.classList.remove('hidden');
 
   // 恢复显示绝对隐私保障提示
