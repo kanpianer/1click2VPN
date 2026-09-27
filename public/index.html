@@ -156,8 +156,37 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label class="block text-[11px] font-medium text-zinc-300 mb-1">节点伪装域名 (SNI)</label>
-                <input id="adv-sni" type="text" value="gateway.icloud.com" 
-                       class="w-full px-3 py-1.5 bg-black/50 border border-zinc-700/60 rounded-lg text-xs text-zinc-200 outline-none focus:border-white">
+                <div class="relative">
+                  <select id="adv-sni" onchange="handleSniChange(this.value)" 
+                          class="w-full px-3 py-1.5 bg-black/50 border border-zinc-700/60 rounded-lg text-xs text-zinc-200 outline-none focus:border-white appearance-none cursor-pointer pr-7">
+                    <option value="swdist.apple.com" selected class="bg-zinc-900 text-zinc-200">swdist.apple.com</option>
+                    <option value="addons.mozilla.org" class="bg-zinc-900 text-zinc-200">addons.mozilla.org</option>
+                    <option value="one-piece.com" class="bg-zinc-900 text-zinc-200">one-piece.com</option>
+                    <option value="m.media-amazon.com" class="bg-zinc-900 text-zinc-200">m.media-amazon.com</option>
+                    <option value="www.lovelive-anime.jp" class="bg-zinc-900 text-zinc-200">www.lovelive-anime.jp</option>
+                    <option value="www.caltech.edu" class="bg-zinc-900 text-zinc-200">www.caltech.edu</option>
+                    <option value="www.suny.edu" class="bg-zinc-900 text-zinc-200">www.suny.edu</option>
+                    <option value="www.suffolk.edu" class="bg-zinc-900 text-zinc-200">www.suffolk.edu</option>
+                    <option value="www.google-analytics.com" class="bg-zinc-900 text-zinc-200">www.google-analytics.com</option>
+                    <option value="react.dev" class="bg-zinc-900 text-zinc-200">react.dev</option>
+                    <option value="www.python.org" class="bg-zinc-900 text-zinc-200">www.python.org</option>
+                    <option value="www.oracle.com" class="bg-zinc-900 text-zinc-200">www.oracle.com</option>
+                    <option value="www.mysql.com" class="bg-zinc-900 text-zinc-200">www.mysql.com</option>
+                    <option value="vercel-dns.com" class="bg-zinc-900 text-zinc-200">vercel-dns.com</option>
+                    <option value="www.swift.com" class="bg-zinc-900 text-zinc-200">www.swift.com</option>
+                    <option value="academy.nvidia.com" class="bg-zinc-900 text-zinc-200">academy.nvidia.com</option>
+                    <option value="www.cisco.com" class="bg-zinc-900 text-zinc-200">www.cisco.com</option>
+                    <option value="www.samsung.com" class="bg-zinc-900 text-zinc-200">www.samsung.com</option>
+                    <option value="www.amd.com" class="bg-zinc-900 text-zinc-200">www.amd.com</option>
+                    <option value="gateway.icloud.com" class="bg-zinc-900 text-zinc-200">gateway.icloud.com</option>
+                    <option value="custom" class="bg-zinc-900 text-zinc-300">✏️ 自定义域名...</option>
+                  </select>
+                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-zinc-400 text-[10px]">▼</div>
+                </div>
+                <div id="sni-custom-container" class="hidden mt-1.5">
+                  <input id="adv-sni-custom" type="text" placeholder="输入自定义域名 (如 www.microsoft.com)" 
+                         class="w-full px-3 py-1.5 bg-black/60 border border-zinc-700/60 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 outline-none focus:border-white transition">
+                </div>
               </div>
               <div>
                 <label class="block text-[11px] font-medium text-zinc-300 mb-1">Reality 端口</label>

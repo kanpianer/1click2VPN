@@ -82,6 +82,29 @@ function toggleAdvancedSettings() {
   }
 }
 
+// 切换 SNI 域名下拉或自定义输入
+function handleSniChange(val) {
+  const customContainer = document.getElementById('sni-custom-container');
+  const customInput = document.getElementById('adv-sni-custom');
+  if (val === 'custom') {
+    customContainer?.classList.remove('hidden');
+    customInput?.focus();
+  } else {
+    customContainer?.classList.add('hidden');
+  }
+}
+
+// 获取当前生效的 SNI 域名
+function getSniValue() {
+  const select = document.getElementById('adv-sni');
+  if (!select) return 'swdist.apple.com';
+  if (select.value === 'custom') {
+    const customVal = document.getElementById('adv-sni-custom')?.value.trim();
+    return customVal || 'swdist.apple.com';
+  }
+  return select.value.trim() || 'swdist.apple.com';
+}
+
 // 终端日志追加
 function appendLog(line) {
   const logs = document.getElementById('terminal-logs');
@@ -130,7 +153,7 @@ async function handleDeploy() {
   const password = document.getElementById('vps-password').value;
   const privateKey = document.getElementById('vps-key').value;
 
-  const sni = document.getElementById('adv-sni').value.trim() || 'gateway.icloud.com';
+  const sni = getSniValue();
   const nodePort = document.getElementById('adv-nodeport').value.trim() || '443';
   const nodeName = document.getElementById('adv-nodename').value.trim() || 'VPS-Reality';
   let workerDomain = document.getElementById('adv-worker').value.trim();
@@ -170,7 +193,7 @@ async function executeDeploy(quickMode = false) {
   const password = document.getElementById('vps-password').value;
   const privateKey = document.getElementById('vps-key').value;
 
-  const sni = document.getElementById('adv-sni').value.trim() || 'gateway.icloud.com';
+  const sni = getSniValue();
   const nodePort = document.getElementById('adv-nodeport').value.trim() || '443';
   const nodeName = document.getElementById('adv-nodename').value.trim() || 'VPS-Reality';
   const DEFAULT_WORKER_RELAY = 'vpn2qr-relay.qstizi.workers.dev';
@@ -474,5 +497,15 @@ function resetApp() {
 
   document.getElementById('vps-password').value = '';
   document.getElementById('vps-key').value = '';
+
+  const sniSelect = document.getElementById('adv-sni');
+  if (sniSelect) {
+    sniSelect.value = 'swdist.apple.com';
+    const customContainer = document.getElementById('sni-custom-container');
+    if (customContainer) customContainer.classList.add('hidden');
+    const customInput = document.getElementById('adv-sni-custom');
+    if (customInput) customInput.value = '';
+  }
+
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
