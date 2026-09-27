@@ -55,6 +55,7 @@
 ├── public/                 # 静态前端资源（直接部署到 Cloudflare Pages）
 │   ├── index.html          # 现代化交互界面 (Tailwind CSS)
 │   ├── app.js              # 前端调度与状态机控制逻辑
+│   ├── libs/               # 纯前端本地依赖库 (xterm.js 交互式终端引擎)
 │   ├── vpn2qr.wasm         # 编译后的 Go WebAssembly SSH 核心引擎
 │   └── wasm_exec.js        # Go 官方 WebAssembly 运行时桥接
 ├── wasm/                   # 端侧 SSH WebAssembly 源码 (Go 语言)
@@ -138,6 +139,19 @@ bash wasm/build.sh
 
 1. 本工具仅供个人服务器管理与合规网络运维学习之用，请严格遵守所在国家及服务商的相关法律法规。
 2. 节点的 UUID、私钥、二维码具有唯一使用权限，请勿截屏发送到公共社交网络或群聊中。
+
+---
+
+## 🙏 鸣谢与开源致谢 (Acknowledgements)
+
+本项目得以实现与完善，特别向以下优秀的开源项目与社区开发者致以诚挚敬意与由衷感谢：
+
+* **[vpn2qr (https://github.com/www222fff/vpn2qr)](https://github.com/www222fff/vpn2qr)**：
+  优秀的纯前端零知识节点搭建设计灵感与核心 VLESS-Reality 自动化配置脚本。
+* **[八合一一键脚本 (https://github.com/mack-a/v2ray-agent)](https://github.com/mack-a/v2ray-agent)**：
+  功能全面、维护活跃的 Xray / VLESS / Trojan / Shadowsocks / VMess 综合多协议交互式管理脚本。
+* **[Snell 一键脚本 (https://github.com/jinqians/snell.sh)](https://github.com/jinqians/snell.sh)**：
+  极简高效、易于上手的 Snell 协议服务端一键部署管理脚本。
 
 ---
 
