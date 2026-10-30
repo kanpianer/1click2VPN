@@ -152,6 +152,8 @@ bash wasm/build.sh
   功能全面、维护活跃的 Xray / VLESS / Trojan / Shadowsocks / VMess 综合多协议交互式管理脚本。
 * **[Snell 一键脚本 (https://github.com/jinqians/snell.sh)](https://github.com/jinqians/snell.sh)**：
   极简高效、易于上手的 Snell 协议服务端一键部署管理脚本。
+* **[Shlii 官方脚本 (https://github.com/0xdabiaoge/singbox-lite)](https://github.com/0xdabiaoge/singbox-lite)**：
+  轻量快捷的 sing-box 极简服务端部署管理脚本。
 
 ---
 

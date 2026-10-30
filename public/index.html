@@ -125,7 +125,7 @@
         <!-- 右上角 脚本 图标与下拉菜单 -->
         <div class="relative shrink-0" id="script-menu-container">
           <button id="btn-script-menu" type="button" onclick="toggleScriptMenu(event)" 
-                  title="选择搭建脚本 (支持 Snell / 八合一交互式脚本)"
+                  title="选择搭建脚本 (支持 Snell / 八合一 / Shlii 脚本)"
                   class="p-2 sm:p-2.5 rounded-xl text-white hover:bg-white/10 active:bg-white/20 transition-all flex items-center justify-center border border-white/15 hover:border-white/40 cursor-pointer shadow-sm group">
             <!-- 纯白脚本图标 (从 SVG 提取) -->
             <svg class="w-5 h-5 text-white transition-transform group-hover:scale-105" viewBox="0 0 64 64" fill="white" xmlns="http://www.w3.org/2000/svg">
@@ -173,6 +173,18 @@
                   <span class="text-[10px] px-1.5 py-0.5 rounded bg-white/20 text-white font-medium">交互式</span>
                 </div>
                 <p class="text-[11px] text-zinc-400 mt-0.5 truncate font-mono">mack-a/v2ray-agent 强大聚合脚本</p>
+              </div>
+            </button>
+
+            <!-- 脚本 3: Shlii 官方脚本 -->
+            <button type="button" onclick="selectScript('shlii')" class="script-option w-full text-left p-2.5 rounded-xl hover:bg-white/10 transition-colors flex items-start space-x-3 group" data-script="shlii">
+              <span class="text-base mt-0.5">🚀</span>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-zinc-200 group-hover:text-white">Shlii 官方脚本</span>
+                  <span class="text-[10px] px-1.5 py-0.5 rounded bg-white/20 text-white font-medium">交互式</span>
+                </div>
+                <p class="text-[11px] text-zinc-400 mt-0.5 truncate font-mono">0xdabiaoge/singbox-lite 极简脚本</p>
               </div>
             </button>
           </div>

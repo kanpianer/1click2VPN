@@ -29,6 +29,13 @@ const SCRIPT_DEFS = {
     btnText: '配置并搭建节点',
     interactive: true,
     cmd: 'wget -P /root -N --no-check-certificate "https://raw.githubusercontent.com/mack-a/v2ray-agent/master/install.sh" && chmod 700 /root/install.sh && /root/install.sh'
+  },
+  shlii: {
+    name: 'Shlii 官方脚本',
+    badge: '已选: Shlii 脚本',
+    btnText: '配置并搭建节点',
+    interactive: true,
+    cmd: '(curl -LfsS https://raw.githubusercontent.com/0xdabiaoge/singbox-lite/main/singbox.sh -o /usr/local/bin/sb || wget -q https://raw.githubusercontent.com/0xdabiaoge/singbox-lite/main/singbox.sh -O /usr/local/bin/sb) && chmod +x /usr/local/bin/sb && sb'
   }
 };
 let currentScriptKey = 'builtin';
