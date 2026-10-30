@@ -44,6 +44,7 @@ function toggleScriptMenu(e) {
   const dropdown = document.getElementById('script-dropdown');
   if (!dropdown) return;
   dropdown.classList.toggle('hidden');
+  document.getElementById('btn-script-menu')?.classList.remove('animate-breathe');
 }
 
 // 选择特定脚本模式
@@ -79,8 +80,9 @@ function selectScript(key) {
     }
   });
 
-  // 关闭下拉菜单
+  // 关闭下拉菜单并停止呼吸动画
   document.getElementById('script-dropdown')?.classList.add('hidden');
+  document.getElementById('btn-script-menu')?.classList.remove('animate-breathe');
 }
 
 // 点击外部区域关闭下拉菜单
@@ -89,6 +91,7 @@ document.addEventListener('click', (e) => {
   const dropdown = document.getElementById('script-dropdown');
   if (menu && dropdown && !menu.contains(e.target)) {
     dropdown.classList.add('hidden');
+    document.getElementById('btn-script-menu')?.classList.remove('animate-breathe');
   }
 });
 
@@ -113,6 +116,26 @@ async function initWasm() {
 // 页面加载完成后预加载 WASM 并支持 #test-success 本地快速预览
 window.addEventListener('DOMContentLoaded', () => {
   initWasm();
+
+  // 用户头两次打开网站，选择搭建脚本 弹窗默认打开，按钮添加呼吸动画提示
+  try {
+    const storageKey = 'bxdt_script_menu_visit_count';
+    const visitCount = parseInt(localStorage.getItem(storageKey) || '0', 10);
+    if (visitCount < 2) {
+      localStorage.setItem(storageKey, (visitCount + 1).toString());
+      const dropdown = document.getElementById('script-dropdown');
+      if (dropdown) {
+        dropdown.classList.remove('hidden');
+      }
+      const menuBtn = document.getElementById('btn-script-menu');
+      if (menuBtn) {
+        menuBtn.classList.add('animate-breathe');
+      }
+    }
+  } catch (err) {
+    console.warn('访问计数读取失败:', err);
+  }
+
   if (window.location.hash === '#test-success') {
     setTimeout(() => {
       showSuccessResult('vless://12345678-1234-1234-1234-123456789abc@198.51.100.23:443?security=reality#VPS-Reality');
