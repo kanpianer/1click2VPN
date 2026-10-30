@@ -120,9 +120,43 @@ async function initWasm() {
   }
 }
 
+// 初始化“不想翻墙”底部随机跳转链接 (按各自 50% 概率打开两个目标地址之一)
+function initBxfqLink() {
+  const bxfqLink = document.getElementById('link-bxfq');
+  if (!bxfqLink) return;
+
+  const targetUrls = [
+    'https://bxfq.sld.tw/',
+    'https://fan.jiakuan.link'
+  ];
+
+  // 各自 50% 概率随机获取网址
+  const getRandomUrl = () => targetUrls[Math.random() < 0.5 ? 0 : 1];
+
+  // 页面初始化时即随机指定目标地址
+  bxfqLink.href = getRandomUrl();
+
+  // 点击时以 50% 概率实时更新目标网址
+  bxfqLink.addEventListener('click', () => {
+    bxfqLink.href = getRandomUrl();
+  });
+
+  // 支持鼠标按下、中键点击、上下文菜单(右键)及键盘交互，确保新标签打开、复制链接等行为均符合 50% 概率
+  bxfqLink.addEventListener('pointerdown', () => {
+    bxfqLink.href = getRandomUrl();
+  });
+  bxfqLink.addEventListener('auxclick', () => {
+    bxfqLink.href = getRandomUrl();
+  });
+  bxfqLink.addEventListener('contextmenu', () => {
+    bxfqLink.href = getRandomUrl();
+  });
+}
+
 // 页面加载完成后预加载 WASM 并支持 #test-success 本地快速预览
 window.addEventListener('DOMContentLoaded', () => {
   initWasm();
+  initBxfqLink();
 
   // 用户头两次打开网站，选择搭建脚本 弹窗默认打开，按钮添加呼吸动画提示
   try {
