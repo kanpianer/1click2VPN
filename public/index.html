@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>不想搭梯 · SSH 工具 - 纯前端零知识 VPS 节点一键搭建工具</title>
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png">
@@ -28,6 +28,15 @@
     html, body {
       overflow-x: hidden;
       max-width: 100vw;
+      touch-action: pan-x pan-y;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+    /* 移动端输入框最小字号保持 16px，防止 iOS 聚焦输入框时页面被强制自动放大 */
+    @media (max-width: 768px) {
+      input, select, textarea {
+        font-size: 16px !important;
+      }
     }
     :root, body, button, input, select, textarea {
       font-family: 'LXGW WenKai', 'LXGW WenKai TC', '霞鹜文楷', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;

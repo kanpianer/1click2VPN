@@ -153,8 +153,58 @@ function initBxfqLink() {
   });
 }
 
+// 禁用页面所有手势与快捷键缩放（多端防缩放加固）
+function disablePageZoom() {
+  // 1. 禁用 iOS Safari 双指捏合手势缩放 (Pinch-to-zoom)
+  document.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false });
+  document.addEventListener('gesturechange', (e) => e.preventDefault(), { passive: false });
+  document.addEventListener('gestureend', (e) => e.preventDefault(), { passive: false });
+
+  // 2. 禁用 iOS 移动端双击页面放大 (Double-tap zoom)
+  let lastTouchEnd = 0;
+  document.addEventListener('touchend', (e) => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 300) {
+      const target = e.target;
+      if (target && !['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(target.tagName)) {
+        e.preventDefault();
+      }
+    }
+    lastTouchEnd = now;
+  }, { passive: false });
+
+  // 3. 禁用多点触控（双指及以上同时触摸触发的缩放行为）
+  document.addEventListener('touchstart', (e) => {
+    if (e.touches && e.touches.length > 1) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  // 4. 禁用桌面端 Ctrl/Cmd + 鼠标滚轮缩放
+  window.addEventListener('wheel', (e) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  // 5. 禁用桌面端快捷键缩放 (Ctrl/Cmd + '+', '-', '=', '0', 小键盘加减等)
+  window.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && (
+      e.key === '+' ||
+      e.key === '-' ||
+      e.key === '=' ||
+      e.key === '0' ||
+      e.code === 'NumpadAdd' ||
+      e.code === 'NumpadSubtract'
+    )) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+}
+
 // 页面加载完成后预加载 WASM 并支持 #test-success 本地快速预览
 window.addEventListener('DOMContentLoaded', () => {
+  disablePageZoom();
   initWasm();
   initBxfqLink();
 
