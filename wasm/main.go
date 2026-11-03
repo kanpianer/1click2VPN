@@ -19,7 +19,12 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-var vlessRegex = regexp.MustCompile(`(vless://[^\s\r\n]+)`)
+var (
+	vlessRegex         = regexp.MustCompile(`(vless://[^\s\r\n]+)`)
+	validPortRegex     = regexp.MustCompile(`^[0-9]{1,5}$`)
+	validSniRegex      = regexp.MustCompile(`^[a-zA-Z0-9.\-]+$`)
+	validNodeNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_\-\.]{1,64}$`)
+)
 
 // shellQuote 对字符串进行 POSIX shell 单引号安全转义。
 // 将值包裹在单引号内，并将内部的单引号转义为 '\''。
@@ -90,6 +95,8 @@ func vpn2qrDeploy(this js.Value, args []js.Value) any {
 		nodePort := opts.Get("nodePort").String()
 		sni := opts.Get("sni").String()
 		nodeName := opts.Get("nodeName").String()
+		expectedFingerprint := opts.Get("expectedFingerprint").String()
+		onHostKeyVerify := opts.Get("onHostKeyVerify")
 
 		if user == "" {
 			user = "root"
@@ -102,6 +109,20 @@ func vpn2qrDeploy(this js.Value, args []js.Value) any {
 		}
 		if nodeName == "" {
 			nodeName = "VPS-Reality"
+		}
+
+		// 后端防御性输入校验：防止任何规避前端校验的恶意输入
+		if !validPortRegex.MatchString(nodePort) {
+			reportError("节点端口号格式不正确 (必须为数字)")
+			return
+		}
+		if !validSniRegex.MatchString(sni) {
+			reportError("伪装域名 (SNI) 格式不正确")
+			return
+		}
+		if !validNodeNameRegex.MatchString(nodeName) {
+			reportError("节点名称格式不正确 (仅限字母数字下划线及连字符)")
+			return
 		}
 
 		reportStatus("正在通过安全隧道连接服务器...")
@@ -123,6 +144,9 @@ func vpn2qrDeploy(this js.Value, args []js.Value) any {
 			wsErrCh <- "WebSocket 连接失败"
 			return nil
 		})
+		defer onOpen.Release()
+		defer onWsError.Release()
+
 		ws.Set("onopen", onOpen)
 		ws.Set("onerror", onWsError)
 
@@ -157,17 +181,28 @@ func vpn2qrDeploy(this js.Value, args []js.Value) any {
 			return
 		}
 
-		// [FIX #11] 自定义 HostKeyCallback：记录并展示服务器主机公钥指纹供用户手动核对。
-		// 注意：对于浏览器端工具，首次连接无法预置受信任指纹，存在 MITM 风险。
-		// 建议用户首次连接后手动核对显示的指纹与 VPS 真实指纹（可在 VPS 上执行 ssh-keygen -lf /etc/ssh/ssh_host_*.pub 查看）。
+		// [FIX MITM] 自定义 HostKeyCallback：支持 TOFU 首次信任比对与强指纹校验，防止中间人伪造中继劫持
 		sshConfig := &ssh.ClientConfig{
 			User: user,
 			Auth: authMethods,
 			HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
 				fingerprint := fingerprintSHA256(key)
 				reportLog(fmt.Sprintf("===> 服务器主机公钥类型: %s | 指纹 (SHA256): %s", key.Type(), fingerprint))
-				reportLog("===> ⚠️  安全提示: 首次连接请手动核对上述指纹与 VPS 真实指纹是否一致，以防中间人攻击 (MITM)。")
-				return nil // 接受任何主机密钥（浏览器首次连接的设计限制）
+
+				// 1. 若配置了显式期望指纹，进行强校验
+				if expectedFingerprint != "" && expectedFingerprint != fingerprint {
+					return fmt.Errorf("主机指纹校验不匹配！期望: %s，实际: %s。疑似遭遇中间人攻击 (MITM)！", expectedFingerprint, fingerprint)
+				}
+
+				// 2. 若配置了前端 TOFU 校验回调（比对 localStorage 中的 known_hosts）
+				if !onHostKeyVerify.IsUndefined() && !onHostKeyVerify.IsNull() {
+					verifyRes := onHostKeyVerify.Invoke(fingerprint, key.Type())
+					if !verifyRes.Truthy() {
+						return fmt.Errorf("主机指纹未被信任或发生突变（指纹: %s），为防中间人攻击已终止连接", fingerprint)
+					}
+				}
+
+				return nil
 			},
 			Timeout: 20 * time.Second,
 		}
@@ -342,6 +377,8 @@ func vpn2qrInteractiveSession(this js.Value, args []js.Value) any {
 	user := opts.Get("user").String()
 	password := opts.Get("password").String()
 	privateKey := opts.Get("privateKey").String()
+	expectedFingerprint := opts.Get("expectedFingerprint").String()
+	onHostKeyVerify := opts.Get("onHostKeyVerify")
 	cmd := ""
 	if !opts.Get("cmd").IsUndefined() && !opts.Get("cmd").IsNull() {
 		cmd = opts.Get("cmd").String()
@@ -368,6 +405,8 @@ func vpn2qrInteractiveSession(this js.Value, args []js.Value) any {
 	var netConn *wsConn
 	var client *ssh.Client
 
+	var sendFn, resizeFn, closeFn js.Func
+
 	cleanup := func() {
 		closeOnce.Do(func() {
 			close(doneCh)
@@ -382,6 +421,12 @@ func vpn2qrInteractiveSession(this js.Value, args []js.Value) any {
 				_ = netConn.Close()
 			}
 			sessionMu.Unlock()
+
+			// 释放 JS 导出控制器函数，防范 WebAssembly 句柄泄漏
+			sendFn.Release()
+			resizeFn.Release()
+			closeFn.Release()
+
 			reportClose()
 		})
 	}
@@ -389,7 +434,7 @@ func vpn2qrInteractiveSession(this js.Value, args []js.Value) any {
 	// 暴露给 JS 的控制器对象
 	controller := js.Global().Get("Object").New()
 
-	sendFn := js.FuncOf(func(this js.Value, args []js.Value) any {
+	sendFn = js.FuncOf(func(this js.Value, args []js.Value) any {
 		if len(args) == 0 {
 			return nil
 		}
@@ -406,7 +451,7 @@ func vpn2qrInteractiveSession(this js.Value, args []js.Value) any {
 		return nil
 	})
 
-	resizeFn := js.FuncOf(func(this js.Value, args []js.Value) any {
+	resizeFn = js.FuncOf(func(this js.Value, args []js.Value) any {
 		if len(args) < 2 {
 			return nil
 		}
@@ -420,7 +465,7 @@ func vpn2qrInteractiveSession(this js.Value, args []js.Value) any {
 		return nil
 	})
 
-	closeFn := js.FuncOf(func(this js.Value, args []js.Value) any {
+	closeFn = js.FuncOf(func(this js.Value, args []js.Value) any {
 		cleanup()
 		return nil
 	})
@@ -445,6 +490,9 @@ func vpn2qrInteractiveSession(this js.Value, args []js.Value) any {
 			wsErrCh <- "WebSocket 连接失败"
 			return nil
 		})
+		defer onOpen.Release()
+		defer onWsError.Release()
+
 		ws.Set("onopen", onOpen)
 		ws.Set("onerror", onWsError)
 
@@ -481,7 +529,7 @@ func vpn2qrInteractiveSession(this js.Value, args []js.Value) any {
 			return
 		}
 
-		// [FIX #11] 自定义 HostKeyCallback：记录并展示服务器主机公钥指纹供用户手动核对。
+		// [FIX MITM] 自定义 HostKeyCallback：记录指纹并支持强核验与 TOFU 检验
 		sshConfig := &ssh.ClientConfig{
 			User: user,
 			Auth: authMethods,
@@ -489,7 +537,18 @@ func vpn2qrInteractiveSession(this js.Value, args []js.Value) any {
 				fingerprint := fingerprintSHA256(key)
 				reportStatus(fmt.Sprintf("服务器主机公钥 (%s): %s", key.Type(), fingerprint))
 				reportData(fmt.Sprintf("\r\n\x1b[36m[SSH HostKey: %s %s]\x1b[0m\r\n", key.Type(), fingerprint))
-				return nil // 接受任何主机密钥（浏览器首次连接的设计限制）
+
+				if expectedFingerprint != "" && expectedFingerprint != fingerprint {
+					return fmt.Errorf("主机指纹校验不匹配！期望: %s，实际: %s。为防止中间人攻击已终止连接", expectedFingerprint, fingerprint)
+				}
+				if !onHostKeyVerify.IsUndefined() && !onHostKeyVerify.IsNull() {
+					res := onHostKeyVerify.Invoke(fingerprint, key.Type())
+					if !res.Truthy() {
+						return fmt.Errorf("主机指纹未被信任或发生突变（指纹: %s），为防中间人攻击已终止连接", fingerprint)
+					}
+				}
+
+				return nil
 			},
 			Timeout: 20 * time.Second,
 		}

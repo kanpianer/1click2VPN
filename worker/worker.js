@@ -10,15 +10,26 @@
 
 import { connect } from 'cloudflare:sockets';
 
-// 简单内存速率限制（基于当前 isolate 生命周期，防范高频端口探测与暴力扫描）
+// 内存速率限制（基于当前 isolate 生命周期，防范高频端口探测与暴力扫描）
 // 正常的 SSH 客户端几分钟才发起 1 次连接；而恶意端口扫描需要 1 秒发起成百上千次。
-// 通过速率限制即可有效阻止恶意扫描滥用，同时完全不影响用户连接自定义 SSH 端口。
 const rateLimitMap = new Map(); // IP -> { count, resetAt }
 const RATE_LIMIT_MAX = 15;       // 每个 IP 窗口内最多允许 15 次新建连接
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 分钟窗口
 
 function checkRateLimit(clientIp) {
   const now = Date.now();
+  // 防内存泄漏：当表项超过 2000 时，清理所有过期表项
+  if (rateLimitMap.size > 2000) {
+    for (const [ip, item] of rateLimitMap.entries()) {
+      if (now > item.resetAt) {
+        rateLimitMap.delete(ip);
+      }
+    }
+    if (rateLimitMap.size > 5000) {
+      rateLimitMap.clear(); // 极端防爆
+    }
+  }
+
   const entry = rateLimitMap.get(clientIp);
   if (!entry || now > entry.resetAt) {
     rateLimitMap.set(clientIp, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
@@ -31,63 +42,170 @@ function checkRateLimit(clientIp) {
   return true;
 }
 
-// [FIX #3] 防范 SSRF：禁止访问内网/私有保留 IP 地址段（加强版）
+// 高危滥用端口黑名单（禁止作为代理连接 SMTP 垃圾邮件、SMB 蠕虫攻击及已知危险端口）
+const BLOCKED_PORTS = new Set([
+  23,   // Telnet 明文
+  25,   // SMTP
+  135,  // RPC
+  137,  // NetBIOS
+  138,  // NetBIOS
+  139,  // NetBIOS
+  161,  // SNMP
+  445,  // SMB
+  465,  // SMTPS
+  587,  // SMTP Submission
+]);
+
+// 规范点分十进制 IPv4 解析器
+function parseIPv4(ipStr) {
+  const parts = ipStr.split('.');
+  if (parts.length !== 4) return null;
+  const octets = [];
+  for (const part of parts) {
+    if (!/^\d+$/.test(part)) return null;
+    if (part.length > 1 && part.startsWith('0')) return null; // 拒绝八进制歧义 (如 0177)
+    const num = Number(part);
+    if (num < 0 || num > 255) return null;
+    octets.push(num);
+  }
+  return octets;
+}
+
+// 规范 IPv6 解析器（支持 :: 压缩展开与嵌入式 IPv4 映射）
+function parseIPv6(ipStr) {
+  let s = ipStr.toLowerCase();
+  
+  // 处理嵌入式 IPv4，如 ::ffff:192.168.1.1
+  const lastColon = s.lastIndexOf(':');
+  if (lastColon !== -1 && s.includes('.')) {
+    const ipv4Part = s.slice(lastColon + 1);
+    const parsedV4 = parseIPv4(ipv4Part);
+    if (!parsedV4) return null;
+    const h1 = ((parsedV4[0] << 8) | parsedV4[1]).toString(16);
+    const h2 = ((parsedV4[2] << 8) | parsedV4[3]).toString(16);
+    s = s.slice(0, lastColon + 1) + h1 + ':' + h2;
+  }
+
+  const doubleColonCount = (s.match(/::/g) || []).length;
+  if (doubleColonCount > 1) return null;
+
+  let parts;
+  if (doubleColonCount === 1) {
+    const [left, right] = s.split('::');
+    const leftParts = left ? left.split(':') : [];
+    const rightParts = right ? right.split(':') : [];
+    const missing = 8 - (leftParts.length + rightParts.length);
+    if (missing < 1) return null;
+    parts = [...leftParts, ...Array(missing).fill('0'), ...rightParts];
+  } else {
+    parts = s.split(':');
+    if (parts.length !== 8) return null;
+  }
+
+  if (parts.length !== 8) return null;
+  const words = [];
+  for (const p of parts) {
+    if (!/^[0-9a-f]{1,4}$/.test(p)) return null;
+    words.push(parseInt(p, 16));
+  }
+  return words;
+}
+
+// [FIX #3] 防范 SSRF：禁止访问内网/私有保留 IP 地址段（深度防御版）
 function isPrivateOrReservedIP(rawIp) {
   if (!rawIp || typeof rawIp !== 'string') return true;
-  const ip = rawIp.trim().replace(/^\[|\]$/g, '');
+  const clean = rawIp.trim().replace(/^\[|\]$/g, '');
 
-  // 拒绝纯数字整数 IP（如 2130706433）或十六进制 IP（如 0x7f000001），防止解析为环回地址
-  if (/^\d+$/.test(ip) || /^0x[0-9a-fA-F]+$/.test(ip)) {
+  // 1. 尝试作为规范 IPv4 验证
+  const v4 = parseIPv4(clean);
+  if (v4) {
+    const [a, b, c, d] = v4;
+    if (a === 0) return true; // 0.0.0.0/8
+    if (a === 10) return true; // 10.0.0.0/8
+    if (a === 127) return true; // 127.0.0.0/8 (Loopback)
+    if (a === 100 && b >= 64 && b <= 127) return true; // 100.64.0.0/10 (CGNAT)
+    if (a === 169 && b === 254) return true; // 169.254.0.0/16 (Link-local / 云元数据)
+    if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
+    if (a === 192 && b === 0 && c === 0) return true; // 192.0.0.0/24
+    if (a === 192 && b === 0 && c === 2) return true; // 192.0.2.0/24 (TEST-NET-1)
+    if (a === 192 && b === 168) return true; // 192.168.0.0/16
+    if (a === 198 && (b === 18 || b === 19)) return true; // 198.18.0.0/15
+    if (a === 198 && b === 51 && c === 100) return true; // 198.51.100.0/24 (TEST-NET-2)
+    if (a === 203 && b === 0 && c === 113) return true; // 203.0.113.0/24 (TEST-NET-3)
+    if (a >= 224) return true; // 224.0.0.0/4 (组播与保留)
+    return false;
+  }
+
+  // 2. 尝试作为规范 IPv6 验证
+  const v6 = parseIPv6(clean);
+  if (v6) {
+    if (v6.every(w => w === 0)) return true; // :: (未指定)
+    if (v6.slice(0, 7).every(w => w === 0) && v6[7] === 1) return true; // ::1 (Loopback)
+    if ((v6[0] & 0xfe00) === 0xfc00) return true; // fc00::/7 (Unique Local)
+    if ((v6[0] & 0xffc0) === 0xfe80) return true; // fe80::/10 (Link-Local)
+    if ((v6[0] & 0xff00) === 0xff00) return true; // ff00::/8 (Multicast)
+    if (v6[0] === 0x2001 && v6[1] === 0x0db8) return true; // 2001:db8::/32 (文档)
+    if (v6[0] === 0x0100 && v6[1] === 0 && v6[2] === 0 && v6[3] === 0) return true; // 100::/64 (Discard)
+
+    // IPv4-mapped (::ffff:x.x.x.x)
+    if (v6.slice(0, 5).every(w => w === 0) && v6[5] === 0xffff) {
+      const v4a = (v6[6] >> 8) & 0xff;
+      const v4b = v6[6] & 0xff;
+      const v4c = (v6[7] >> 8) & 0xff;
+      const v4d = v6[7] & 0xff;
+      return isPrivateOrReservedIP(`${v4a}.${v4b}.${v4c}.${v4d}`);
+    }
+
+    // NAT64 (64:ff9b::x.x.x.x)
+    if (v6[0] === 0x0064 && v6[1] === 0xff9b && v6.slice(2, 6).every(w => w === 0)) {
+      const v4a = (v6[6] >> 8) & 0xff;
+      const v4b = v6[6] & 0xff;
+      const v4c = (v6[7] >> 8) & 0xff;
+      const v4d = v6[7] & 0xff;
+      return isPrivateOrReservedIP(`${v4a}.${v4b}.${v4c}.${v4d}`);
+    }
+
+    // IPv4-compatible (::x.x.x.x)
+    if (v6.slice(0, 6).every(w => w === 0) && (v6[6] !== 0 || v6[7] > 1)) {
+      const v4a = (v6[6] >> 8) & 0xff;
+      const v4b = v6[6] & 0xff;
+      const v4c = (v6[7] >> 8) & 0xff;
+      const v4d = v6[7] & 0xff;
+      return isPrivateOrReservedIP(`${v4a}.${v4b}.${v4c}.${v4d}`);
+    }
+
+    return false;
+  }
+
+  // 3. 非合法 IP：如果是纯数字整数、十六进制、含特殊伪造字符，一律拦截
+  if (/^\d+$/.test(clean) || /^0x[0-9a-f]+$/i.test(clean)) return true;
+  if (clean.includes('/') || clean.includes(' ') || clean.includes('@')) return true;
+
+  // 4. 拦截非规范点分 IPv4 变体（如 127.1, 127.0.1, 0177.0.0.1 等）
+  if (/^[\d.]+$/.test(clean) && !v4) {
     return true;
   }
 
-  // [FIX #3a] 处理 IPv6 mapped IPv4 地址（如 ::ffff:192.168.1.1）
-  const ipv6MappedRegex = /^::ffff:([0-9a-fA-F.:]+)$/i;
-  const mappedMatch = ip.match(ipv6MappedRegex);
-  if (mappedMatch) {
-    // 递归检查内嵌的 IPv4 地址
-    return isPrivateOrReservedIP(mappedMatch[1]);
-  }
-
-  // 点分十进制 IPv4
-  const parts = ip.split('.');
-  if (parts.length === 4 && parts.every(p => /^\d+$/.test(p))) {
-    // [FIX #3d] 拒绝段内前导零（防止八进制解释歧义，如 0177.0.0.1）或超出 3 位数
-    if (parts.some(p => (p.length > 1 && p.startsWith('0')) || p.length > 3)) {
-      return true;
-    }
-
-    const octets = parts.map(Number);
-    // [FIX #3b] 每段必须在 0-255 之间，防止 "999.0.0.1" 等超范围绕过
-    if (octets.some(o => o > 255)) return true;
-
-    if (octets[0] === 10) return true; // 10.0.0.0/8
-    if (octets[0] === 127) return true; // 127.0.0.0/8 (Loopback)
-    if (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) return true; // 172.16.0.0/12
-    if (octets[0] === 192 && octets[1] === 168) return true; // 192.168.0.0/16
-    if (octets[0] === 169 && octets[1] === 254) return true; // 169.254.0.0/16 (Link-local)
-    if (octets[0] === 0 || octets[0] >= 224) return true; // 0.0.0.0, 组播与保留
-    // [FIX #3c] 补充缺失的 RFC 保留段
-    if (octets[0] === 100 && octets[1] >= 64 && octets[1] <= 127) return true; // 100.64.0.0/10 (CGNAT 共享地址)
-    if (octets[0] === 198 && (octets[1] === 18 || octets[1] === 19)) return true; // 198.18.0.0/15 (基准测试)
-    if (octets[0] === 198 && octets[1] === 51 && octets[2] === 100) return true; // 198.51.100.0/24 (文档用)
-    if (octets[0] === 203 && octets[1] === 0 && octets[2] === 113) return true;  // 203.0.113.0/24 (文档用)
-  }
-
-  const lower = ip.toLowerCase();
+  // 5. 域名检查：拦截内网保留域名及常见 DNS 重新绑定服务
+  const lower = clean.toLowerCase();
   if (
-    lower === '::' ||
-    lower === '::1' ||
     lower === 'localhost' ||
-    lower.startsWith('fc') ||
-    lower.startsWith('fd') ||
-    lower.startsWith('fe80') ||
-    lower.startsWith('fe8') ||
-    lower.startsWith('fe9') ||
-    lower.startsWith('fea') ||
-    lower.startsWith('feb') ||
-    lower === '0:0:0:0:0:0:0:0' ||
-    lower === '0:0:0:0:0:0:0:1'
+    lower.endsWith('.localhost') ||
+    lower.endsWith('.local') ||
+    lower.endsWith('.internal') ||
+    lower.endsWith('.lan') ||
+    lower.endsWith('.home') ||
+    lower.endsWith('.corp') ||
+    lower.endsWith('.arpa') ||
+    lower.endsWith('.test') ||
+    lower.endsWith('.invalid') ||
+    lower.endsWith('.example') ||
+    lower.endsWith('.onion') ||
+    lower.includes('nip.io') ||
+    lower.includes('sslip.io') ||
+    lower.includes('xip.io') ||
+    lower.includes('vcap.me') ||
+    lower.includes('traefik.me')
   ) {
     return true;
   }
@@ -143,6 +261,16 @@ export default {
         return new Response('Expected WebSocket upgrade connection', { status: 426 });
       }
 
+      // [FIX CSWSH] 校验 Origin 标头，防范恶意跨站 WebSocket 劫持
+      const origin = request.headers.get('Origin');
+      if (env.ALLOWED_ORIGIN && env.ALLOWED_ORIGIN !== '*') {
+        const allowedOrigins = env.ALLOWED_ORIGIN.split(',').map(s => s.trim().toLowerCase());
+        const originLower = (origin || '').toLowerCase();
+        if (!origin || !allowedOrigins.includes(originLower)) {
+          return new Response('Forbidden: Cross-origin WebSocket request rejected', { status: 403 });
+        }
+      }
+
       const targetHost = url.searchParams.get('host');
       const targetPort = parseInt(url.searchParams.get('port') || '22', 10);
 
@@ -152,6 +280,13 @@ export default {
 
       if (isNaN(targetPort) || targetPort < 1 || targetPort > 65535) {
         return new Response('Invalid port parameter', { status: 400 });
+      }
+
+      // [FIX PORT ABUSE] 禁止中继到高危滥用端口（SMTP 邮件、SMB 蠕虫攻击等）
+      if (BLOCKED_PORTS.has(targetPort)) {
+        return new Response(`Forbidden: Port ${targetPort} is blocked for security and anti-abuse protection`, {
+          status: 403,
+        });
       }
 
       const cleanHost = targetHost.trim().replace(/^\[|\]$/g, '');
@@ -178,7 +313,7 @@ export default {
         });
       }
 
-      // [FIX #4] 简单内存速率限制检查
+      // [FIX #4] 内存速率限制检查（含自动清理防泄漏）
       if (!checkRateLimit(clientIp)) {
         return new Response('Too Many Requests: rate limit exceeded. Please wait before reconnecting.', {
           status: 429,
@@ -193,6 +328,7 @@ export default {
       let tcpSocket = null;
       let tcpWriter = null;
       let tcpReader = null;
+      let isCleanedUp = false;
 
       try {
         // 使用 Cloudflare 官方 Sockets API 直连目标 VPS 的 SSH 端口
@@ -204,15 +340,23 @@ export default {
         tcpWriter = tcpSocket.writable.getWriter();
         tcpReader = tcpSocket.readable.getReader();
 
+        // 统一清理释放函数，确保 WebSocket 与底层 TCP 读写器双向彻底关闭
+        const cleanupRelay = () => {
+          if (isCleanedUp) return;
+          isCleanedUp = true;
+          clearTimeout(timeoutId);
+          try { tcpReader.cancel(); } catch (_) {}
+          try { tcpWriter.close(); } catch (_) {}
+          try { serverWs.close(); } catch (_) {}
+        };
+
         // [FIX #5] 30 分钟连接超时保护，防止空闲连接长期占用 Worker 资源
         const CONNECTION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
         const timeoutId = setTimeout(() => {
           try {
             serverWs.close(1001, 'Connection timeout: 30-minute idle limit reached');
           } catch (_) {}
-          try {
-            tcpWriter.close();
-          } catch (_) {}
+          cleanupRelay();
         }, CONNECTION_TIMEOUT_MS);
 
         // 管道 A：WebSocket (浏览器) -> TCP (VPS)
@@ -228,18 +372,12 @@ export default {
             }
             await tcpWriter.write(chunk);
           } catch (err) {
-            try {
-              serverWs.close(1011, `TCP write error: ${err.message}`);
-            } catch (_) {}
+            cleanupRelay();
           }
         });
 
-        serverWs.addEventListener('close', () => {
-          clearTimeout(timeoutId);
-          try {
-            tcpWriter.close();
-          } catch (_) {}
-        });
+        serverWs.addEventListener('close', cleanupRelay);
+        serverWs.addEventListener('error', cleanupRelay);
 
         // 管道 B：TCP (VPS) -> WebSocket (浏览器)
         (async () => {
@@ -254,10 +392,7 @@ export default {
           } catch (err) {
             // TCP 读取异常或连接正常关闭
           } finally {
-            clearTimeout(timeoutId);
-            try {
-              serverWs.close(1000, 'TCP connection closed');
-            } catch (_) {}
+            cleanupRelay();
           }
         })();
 
@@ -265,8 +400,6 @@ export default {
           status: 101,
           webSocket: clientWs,
           headers: {
-            // 风险说明：WebSocket 中继工具必须允许任意来源，这是设计需求。
-            // 可通过 env.ALLOWED_ORIGIN 环境变量配置限制（建议生产环境设置）。
             'Access-Control-Allow-Origin': env.ALLOWED_ORIGIN || '*',
           },
         });

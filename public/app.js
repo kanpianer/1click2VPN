@@ -28,7 +28,7 @@ const SCRIPT_DEFS = {
     badge: '已选: 八合一脚本',
     btnText: '配置并搭建节点',
     interactive: true,
-    cmd: 'wget -P /root -N --no-check-certificate "https://raw.githubusercontent.com/mack-a/v2ray-agent/master/install.sh" && chmod 700 /root/install.sh && /root/install.sh'
+    cmd: 'wget -P /root -N "https://raw.githubusercontent.com/mack-a/v2ray-agent/master/install.sh" && chmod 700 /root/install.sh && /root/install.sh'
   },
   shlii: {
     name: 'Shlii 官方脚本',
@@ -207,6 +207,7 @@ window.addEventListener('DOMContentLoaded', () => {
   disablePageZoom();
   initWasm();
   initBxfqLink();
+  updateKnownHostsUI();
 
   // 用户头两次打开网站，选择搭建脚本 弹窗默认打开，按钮添加呼吸动画提示
   try {
@@ -465,6 +466,66 @@ async function handleDeploy() {
   await executeDeploy(false);
 }
 
+// [FIX MITM & TOFU] 本地 SSH 已知主机公钥指纹库 (类似 ~/.ssh/known_hosts)
+const KNOWN_HOSTS_STORAGE_KEY = 'bxdt_ssh_known_hosts';
+
+function getKnownHosts() {
+  try {
+    return JSON.parse(localStorage.getItem(KNOWN_HOSTS_STORAGE_KEY) || '{}');
+  } catch (_) {
+    return {};
+  }
+}
+
+function saveKnownHost(host, port, fingerprint) {
+  const hosts = getKnownHosts();
+  hosts[`${host}:${port}`] = fingerprint;
+  try {
+    localStorage.setItem(KNOWN_HOSTS_STORAGE_KEY, JSON.stringify(hosts));
+  } catch (_) {}
+  updateKnownHostsUI();
+}
+
+function clearKnownHosts() {
+  if (confirm('确认清空所有已保存的 VPS 主机公钥指纹记录吗？清空后下次连接各主机将重新记录指纹。')) {
+    localStorage.removeItem(KNOWN_HOSTS_STORAGE_KEY);
+    updateKnownHostsUI();
+    alert('已成功清空本地已知主机指纹缓存');
+  }
+}
+
+function updateKnownHostsUI() {
+  const btn = document.getElementById('btn-clear-hosts');
+  if (!btn) return;
+  const count = Object.keys(getKnownHosts()).length;
+  btn.textContent = `重置已知主机缓存 (已记录 ${count} 台)`;
+}
+
+// 核心指纹校验器 (TOFU 首次使用信任与防突变拦截)
+function verifyHostKey(host, port, fingerprint, keyType) {
+  const hostKey = `${host}:${port}`;
+  const knownHosts = getKnownHosts();
+  const existing = knownHosts[hostKey];
+
+  if (!existing) {
+    // 首次连接：信任并保存 (TOFU - Trust On First Use)
+    saveKnownHost(host, port, fingerprint);
+    appendLog(`==> [首次连接 VPS] 已安全记录主机指纹 (${keyType}): ${fingerprint}`);
+    return true;
+  }
+
+  if (existing === fingerprint) {
+    appendLog(`==> [安全核对通过] 主机指纹与已知记录一致 (${keyType})`);
+    return true;
+  }
+
+  // 指纹不匹配！极大概率遭受中间人攻击或系统重装
+  const errMsg = `⚠️ 严重安全警告：服务器主机公钥指纹不一致！\n\n目标 VPS: ${host}:${port}\n本地记录指纹: ${existing}\n当前接收指纹: ${fingerprint}\n\n可能原因：VPS 操作系统已重新安装，或当前中继/网络正在遭受中间人劫持 (MITM)！\n为杜绝密码与私钥泄露，连接已被系统强制终止。\n\n若您确认 VPS 确已重装系统，请在高级设置中点击【重置已知主机缓存】后重试。`;
+  alert(errMsg);
+  appendLog(`❌ 致命安全警报: 主机公钥指纹突变！期望 ${existing}，实际 ${fingerprint}。为防中间人窃密已终止！`);
+  return false;
+}
+
 // 核心执行逻辑 (支持 quickMode)
 async function executeDeploy(quickMode = false) {
   if (!validateInputs()) return;
@@ -474,6 +535,15 @@ async function executeDeploy(quickMode = false) {
   const user = document.getElementById('vps-user').value.trim() || 'root';
   const password = document.getElementById('vps-password').value;
   const privateKey = document.getElementById('vps-key').value;
+  const expectedFingerprint = document.getElementById('adv-fingerprint')?.value.trim() || '';
+
+  // [FIX 凭据销毁] 及时抹除 DOM 中驻留的敏感密码及私钥输入，防范扩展嗅探与内存遗留
+  setTimeout(() => {
+    const pwdInput = document.getElementById('vps-password');
+    const keyInput = document.getElementById('vps-key');
+    if (pwdInput) pwdInput.value = '';
+    if (keyInput) keyInput.value = '';
+  }, 100);
 
   const sni = getSniValue();
   const nodePort = document.getElementById('adv-nodeport').value.trim() || '443';
@@ -521,6 +591,8 @@ async function executeDeploy(quickMode = false) {
       sni: sni,
       nodeName: nodeName,
       quickMode: quickMode,
+      expectedFingerprint: expectedFingerprint,
+      onHostKeyVerify: (fingerprint, keyType) => verifyHostKey(host, port, fingerprint, keyType),
     },
     // onStatus 回调
     (statusText) => {
@@ -563,6 +635,16 @@ async function executeInteractiveTerminal(scriptKey) {
 
   const def = SCRIPT_DEFS[scriptKey];
   if (!def) return;
+
+  const expectedFingerprint = document.getElementById('adv-fingerprint')?.value.trim() || '';
+
+  // [FIX 凭据销毁] 及时抹除 DOM 中驻留的敏感密码及私钥输入，防范扩展嗅探与内存遗留
+  setTimeout(() => {
+    const pwdInput = document.getElementById('vps-password');
+    const keyInput = document.getElementById('vps-key');
+    if (pwdInput) pwdInput.value = '';
+    if (keyInput) keyInput.value = '';
+  }, 100);
 
   const DEFAULT_WORKER_RELAY = 'vpn2qr-relay.qstizi.workers.dev';
   let workerDomain = document.getElementById('adv-worker')?.value.trim() || DEFAULT_WORKER_RELAY;
@@ -682,7 +764,9 @@ async function executeInteractiveTerminal(scriptKey) {
     privateKey: authMode === 'key' ? privateKey : '',
     cols: term.cols || 80,
     rows: term.rows || 24,
-    cmd: def.cmd
+    cmd: def.cmd,
+    expectedFingerprint: expectedFingerprint,
+    onHostKeyVerify: (fingerprint, keyType) => verifyHostKey(host, port, fingerprint, keyType),
   }, {
     onStatus: (status) => {
       const pill = document.getElementById('terminal-status-pill');
