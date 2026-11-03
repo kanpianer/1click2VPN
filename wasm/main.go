@@ -5,8 +5,11 @@ package main
 
 import (
 	"bufio"
+	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"io"
+	"net"
 	"regexp"
 	"strings"
 	"sync"
@@ -17,6 +20,19 @@ import (
 )
 
 var vlessRegex = regexp.MustCompile(`(vless://[^\s\r\n]+)`)
+
+// shellQuote 对字符串进行 POSIX shell 单引号安全转义。
+// 将值包裹在单引号内，并将内部的单引号转义为 '\''。
+// 这样可以防止 nodeName、sni、nodePort 等用户输入导致的 shell 命令注入。
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
+}
+
+// fingerprintSHA256 计算 SSH 主机公钥的 SHA256 指纹（与 OpenSSH 格式一致）
+func fingerprintSHA256(key ssh.PublicKey) string {
+	hash := sha256.Sum256(key.Marshal())
+	return "SHA256:" + base64.StdEncoding.EncodeToString(hash[:])
+}
 
 func main() {
 	c := make(chan struct{}, 0)
@@ -141,11 +157,19 @@ func vpn2qrDeploy(this js.Value, args []js.Value) any {
 			return
 		}
 
+		// [FIX #11] 自定义 HostKeyCallback：记录并展示服务器主机公钥指纹供用户手动核对。
+		// 注意：对于浏览器端工具，首次连接无法预置受信任指纹，存在 MITM 风险。
+		// 建议用户首次连接后手动核对显示的指纹与 VPS 真实指纹（可在 VPS 上执行 ssh-keygen -lf /etc/ssh/ssh_host_*.pub 查看）。
 		sshConfig := &ssh.ClientConfig{
-			User:            user,
-			Auth:            authMethods,
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(), // 浏览器端首次动态连接忽略主机密钥指纹
-			Timeout:         20 * time.Second,
+			User: user,
+			Auth: authMethods,
+			HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+				fingerprint := fingerprintSHA256(key)
+				reportLog(fmt.Sprintf("===> 服务器主机公钥类型: %s | 指纹 (SHA256): %s", key.Type(), fingerprint))
+				reportLog("===> ⚠️  安全提示: 首次连接请手动核对上述指纹与 VPS 真实指纹是否一致，以防中间人攻击 (MITM)。")
+				return nil // 接受任何主机密钥（浏览器首次连接的设计限制）
+			},
+			Timeout: 20 * time.Second,
 		}
 
 		reportStatus("正在验证 SSH 身份凭证...")
@@ -193,10 +217,12 @@ func vpn2qrDeploy(this js.Value, args []js.Value) any {
 		if quickMode {
 			reportStatus("正在尝试快速提取已有节点信息 (免重装模式)...")
 			reportLog("==> 检测到快速恢复模式，直接执行 reprint-link.sh 提取密钥...")
-			execCmd = fmt.Sprintf("export NODE_NAME=%s && curl -fsSL https://raw.githubusercontent.com/www222fff/vpn2qr/main/reprint-link.sh | bash", nodeName)
+			// [FIX #7] 使用 shellQuote 对 nodeName 进行安全转义，防止 shell 注入
+			execCmd = fmt.Sprintf("export NODE_NAME=%s && curl -fsSL https://raw.githubusercontent.com/www222fff/vpn2qr/main/reprint-link.sh | bash", shellQuote(nodeName))
 		} else {
+			// [FIX #7] 使用 shellQuote 对所有用户输入变量进行安全转义，防止 shell 注入
 			execCmd = fmt.Sprintf("export PORT=%s SNI=%s NODE_NAME=%s && curl -fsSL https://raw.githubusercontent.com/www222fff/vpn2qr/main/install.sh | bash",
-				nodePort, sni, nodeName)
+				shellQuote(nodePort), shellQuote(sni), shellQuote(nodeName))
 		}
 
 		if err := session.Start(execCmd); err != nil {
@@ -455,11 +481,17 @@ func vpn2qrInteractiveSession(this js.Value, args []js.Value) any {
 			return
 		}
 
+		// [FIX #11] 自定义 HostKeyCallback：记录并展示服务器主机公钥指纹供用户手动核对。
 		sshConfig := &ssh.ClientConfig{
-			User:            user,
-			Auth:            authMethods,
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-			Timeout:         20 * time.Second,
+			User: user,
+			Auth: authMethods,
+			HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+				fingerprint := fingerprintSHA256(key)
+				reportStatus(fmt.Sprintf("服务器主机公钥 (%s): %s", key.Type(), fingerprint))
+				reportData(fmt.Sprintf("\r\n\x1b[36m[SSH HostKey: %s %s]\x1b[0m\r\n", key.Type(), fingerprint))
+				return nil // 接受任何主机密钥（浏览器首次连接的设计限制）
+			},
+			Timeout: 20 * time.Second,
 		}
 
 		reportStatus("正在验证 SSH 身份凭证...")

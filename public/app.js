@@ -294,10 +294,40 @@ function updateStep(stepNumber) {
   }
 }
 
-// 处理表单提交与部署
-async function handleDeploy() {
+// [FIX #8] 输入验证辅助函数
+function isValidHost(host) {
+  // 合法 IPv4
+  const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+  if (ipv4Regex.test(host)) {
+    return host.split('.').map(Number).every(o => o >= 0 && o <= 255);
+  }
+  // 合法 IPv6（简单检测，允许包含冒号和十六进制）
+  if (host.includes(':')) {
+    return /^[0-9a-fA-F:]+$/.test(host) || /^\[?[0-9a-fA-F:]+\]?$/.test(host);
+  }
+  // 合法域名：字母数字、连字符、点，至少两段
+  const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$/;
+  return domainRegex.test(host) && host.length <= 253;
+}
+
+function isValidPort(portVal) {
+  const n = parseInt(portVal, 10);
+  return !isNaN(n) && n >= 1 && n <= 65535 && String(n) === String(portVal).trim();
+}
+
+function isValidNodeName(name) {
+  return /^[a-zA-Z0-9\-_]{1,64}$/.test(name);
+}
+
+function isValidSni(sni) {
+  // 合法域名格式：字母数字、点、连字符
+  return /^[a-zA-Z0-9][a-zA-Z0-9.\-]{0,252}$/.test(sni);
+}
+
+// 全局表单输入验证
+function validateInputs() {
   const host = document.getElementById('vps-host').value.trim();
-  const port = parseInt(document.getElementById('vps-port').value.trim() || '22', 10);
+  const port = document.getElementById('vps-port').value.trim() || '22';
   const user = document.getElementById('vps-user').value.trim() || 'root';
   const password = document.getElementById('vps-password').value;
   const privateKey = document.getElementById('vps-key').value;
@@ -305,19 +335,64 @@ async function handleDeploy() {
   const sni = getSniValue();
   const nodePort = document.getElementById('adv-nodeport').value.trim() || '443';
   const nodeName = document.getElementById('adv-nodename').value.trim() || 'VPS-Reality';
-  let workerDomain = document.getElementById('adv-worker').value.trim();
+  const workerDomain = document.getElementById('adv-worker')?.value.trim() || '';
 
-  // 基础校验
   if (!host) {
     alert('请输入 VPS IP 地址');
-    return;
+    return false;
+  }
+  // [FIX #8] 验证 host 格式
+  if (!isValidHost(host)) {
+    alert('VPS IP 地址或域名格式不正确，请检查输入');
+    return false;
+  }
+  // [FIX #8] 验证 SSH port 范围
+  if (!isValidPort(port)) {
+    alert('SSH 端口号必须为 1-65535 之间的整数');
+    return false;
+  }
+  // [FIX #8] 验证用户名合法性
+  if (!/^[a-zA-Z0-9_\-\.]{1,64}$/.test(user)) {
+    alert('用户名格式不正确（仅允许字母、数字、点、下划线和连字符，长度 1-64）');
+    return false;
+  }
+  // [FIX #8] 验证 nodePort 范围
+  if (!isValidPort(nodePort)) {
+    alert('节点端口号必须为 1-65535 之间的整数');
+    return false;
+  }
+  // [FIX #8] 验证 nodeName 字符集（防止 shell 注入，见 wasm/main.go #7）
+  if (!isValidNodeName(nodeName)) {
+    alert('节点名称只允许字母、数字、连字符和下划线，且长度不超过 64 个字符');
+    return false;
+  }
+  // [FIX #8] 验证 SNI 域名格式
+  if (!isValidSni(sni)) {
+    alert('SNI 域名格式不正确，只允许字母数字、点和连字符');
+    return false;
+  }
+  // [FIX #8] 验证中继 Worker 域名格式
+  if (workerDomain) {
+    const cleanWorker = workerDomain.replace(/^https?:\/\//, '').replace(/^wss?:\/\//, '').replace(/\/+$/, '');
+    if (!/^[a-zA-Z0-9.\-]+(:[0-9]{1,5})?$/.test(cleanWorker)) {
+      alert('Cloudflare Worker 域名格式不正确');
+      return false;
+    }
   }
   if (authMode === 'password' && !password) {
     alert('请输入 VPS root 密码');
-    return;
+    return false;
   }
   if (authMode === 'key' && !privateKey) {
     alert('请粘贴 SSH 私钥');
+    return false;
+  }
+  return true;
+}
+
+// 处理表单提交与部署
+async function handleDeploy() {
+  if (!validateInputs()) {
     return;
   }
 
@@ -342,6 +417,8 @@ async function handleDeploy() {
 
 // 核心执行逻辑 (支持 quickMode)
 async function executeDeploy(quickMode = false) {
+  if (!validateInputs()) return;
+
   const host = document.getElementById('vps-host').value.trim();
   const port = parseInt(document.getElementById('vps-port').value.trim() || '22', 10);
   const user = document.getElementById('vps-user').value.trim() || 'root';
@@ -426,6 +503,8 @@ async function executeDeploy(quickMode = false) {
 
 // 执行交互式模拟终端会话 (Snell / 八合一等)
 async function executeInteractiveTerminal(scriptKey) {
+  if (!validateInputs()) return;
+
   const host = document.getElementById('vps-host').value.trim();
   const port = parseInt(document.getElementById('vps-port').value.trim() || '22', 10);
   const user = document.getElementById('vps-user').value.trim() || 'root';
@@ -634,6 +713,34 @@ function closeInteractiveTerminal() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+// [FIX #6] 安全辅助函数：使用 DOM API 更新诊断状态指示器（避免 innerHTML 注入风险）
+function setDiagStatus(element, dotColorClass, labelText, textColorClass) {
+  if (!element) return;
+  element.className = `font-medium ${textColorClass} flex items-center`;
+  element.innerHTML = ''; // 清空旧内容
+  const dot = document.createElement('span');
+  dot.className = `w-2 h-2 rounded-full ${dotColorClass} mr-1.5`;
+  element.appendChild(dot);
+  element.appendChild(document.createTextNode(' ' + labelText));
+}
+
+// [FIX #6] 安全辅助函数：使用 DOM API 构建诊断建议列表（代替 innerHTML 拼接）
+function setDiagAdvice(element, adviceItems) {
+  if (!element) return;
+  element.innerHTML = ''; // 清空旧内容
+  adviceItems.forEach((item, idx) => {
+    if (idx > 0) {
+      element.appendChild(document.createElement('br'));
+    }
+    const line = document.createElement('span');
+    // item 为 { text: string, html?: string }
+    // 对于硬编码的 HTML 片段（strong/code 标签），使用 innerHTML 是安全的
+    // 因为内容完全由开发者控制，不包含任何用户输入
+    line.innerHTML = `${idx + 1}. ${item}`;
+    element.appendChild(line);
+  });
+}
+
 // 智能诊断分析与卡片展示
 function showDiagnosticCard(errMsg) {
   document.getElementById('card-progress').classList.add('hidden');
@@ -645,53 +752,47 @@ function showDiagnosticCard(errMsg) {
   const diagReason = document.getElementById('diag-reason');
   const diagAdvice = document.getElementById('diag-advice');
 
+  // diagReason 使用 innerText 确保用户错误信息不被解析为 HTML（安全）
   diagReason.innerText = errMsg;
 
   const errLower = (errMsg || '').toLowerCase();
 
   // 1. 密码或身份验证失败
   if (errLower.includes('认证失败') || errLower.includes('handshake failed') || errLower.includes('unable to authenticate') || errLower.includes('password')) {
-    diagPort.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></span> 正常连通';
-    diagPort.className = 'font-medium text-emerald-600 flex items-center';
-    diagAuth.innerHTML = '<span class="w-2 h-2 rounded-full bg-rose-500 mr-1.5"></span> 密码/凭证被拒绝';
-    diagAuth.className = 'font-medium text-rose-600 flex items-center';
-    diagAdvice.innerHTML = `
-      1. 请仔细检查 VPS 的 root 密码是否拼写错误（注意大小写与特殊符号）；<br>
-      2. 部分云厂商（如 AWS EC2、甲骨文、部分 Debian 镜像）默认<strong>关闭了密码登录</strong>，仅允许使用私钥，请切换到【SSH 私钥】模式；<br>
-      3. 若使用密码，可检查 VPS 的 <code>/etc/ssh/sshd_config</code> 中是否设置了 <code>PermitRootLogin yes</code> 与 <code>PasswordAuthentication yes</code>。
-    `;
+    setDiagStatus(diagPort, 'bg-emerald-500', '正常连通', 'text-emerald-600');
+    setDiagStatus(diagAuth, 'bg-rose-500', '密码/凭证被拒绝', 'text-rose-600');
+    setDiagAdvice(diagAdvice, [
+      '请仔细检查 VPS 的 root 密码是否拼写错误（注意大小写与特殊符号）；',
+      '部分云厂商（如 AWS EC2、甲骨文、部分 Debian 镜像）默认<strong>关闭了密码登录</strong>，仅允许使用私钥，请切换到【SSH 私钥】模式；',
+      '若使用密码，可检查 VPS 的 <code>/etc/ssh/sshd_config</code> 中是否设置了 <code>PermitRootLogin yes</code> 与 <code>PasswordAuthentication yes</code>。',
+    ]);
   }
   // 2. 端口不通或网络超时
   else if (errLower.includes('超时') || errLower.includes('timeout') || errLower.includes('refused') || errLower.includes('dial tcp')) {
-    diagPort.innerHTML = '<span class="w-2 h-2 rounded-full bg-rose-500 mr-1.5"></span> 无法连通 22 端口';
-    diagPort.className = 'font-medium text-rose-600 flex items-center';
-    diagAuth.innerHTML = '<span class="w-2 h-2 rounded-full bg-slate-300 mr-1.5"></span> 未到达此步骤';
-    diagAuth.className = 'font-medium text-slate-400 flex items-center';
-    diagAdvice.innerHTML = `
-      1. 请登录云厂商控制台，确认该 VPS 处于<strong>运行中 (Running)</strong> 状态；<br>
-      2. 检查云厂商后台的<strong>安全组 (Security Group) / 防火墙</strong>，是否已放行入站 <code>TCP 22</code> 端口；<br>
-      3. 确认该 VPS 的公网 IP 是否输入正确；若修改过默认 SSH 端口，请在上方填写对应端口。
-    `;
+    setDiagStatus(diagPort, 'bg-rose-500', '无法连通 22 端口', 'text-rose-600');
+    setDiagStatus(diagAuth, 'bg-slate-300', '未到达此步骤', 'text-slate-400');
+    setDiagAdvice(diagAdvice, [
+      '请登录云厂商控制台，确认该 VPS 处于<strong>运行中 (Running)</strong> 状态；',
+      '检查云厂商后台的<strong>安全组 (Security Group) / 防火墙</strong>，是否已放行入站 <code>TCP 22</code> 端口；',
+      '确认该 VPS 的公网 IP 是否输入正确；若修改过默认 SSH 端口，请在上方填写对应端口。',
+    ]);
   }
   // 3. 中继异常
   else if (errLower.includes('websocket') || errLower.includes('中继')) {
-    diagRelay.innerHTML = '<span class="w-2 h-2 rounded-full bg-rose-500 mr-1.5"></span> 连接受阻';
-    diagRelay.className = 'font-medium text-rose-600 flex items-center';
-    diagAdvice.innerHTML = `
-      1. Cloudflare 边缘节点握手受阻，请检查当前本地网络是否可正常连接；<br>
-      2. 若自行部署了 Worker，请确认高级设置中的 Worker 域名配置无误且状态为 Active。
-    `;
+    setDiagStatus(diagRelay, 'bg-rose-500', '连接受阻', 'text-rose-600');
+    setDiagAdvice(diagAdvice, [
+      'Cloudflare 边缘节点握手受阻，请检查当前本地网络是否可正常连接；',
+      '若自行部署了 Worker，请确认高级设置中的 Worker 域名配置无误且状态为 Active。',
+    ]);
   }
   // 4. 其他中断（如 apt lock 或依赖下载慢）
   else {
-    diagPort.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></span> 正常连通';
-    diagPort.className = 'font-medium text-emerald-600 flex items-center';
-    diagAuth.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></span> 认证通过';
-    diagAuth.className = 'font-medium text-emerald-600 flex items-center';
-    diagAdvice.innerHTML = `
-      1. 脚本执行被中断。若 VPS 之前已安装过部分组件，可直接点击下方的<strong>【快速取回已有节点】</strong>（免重新下载，约 1 秒提取）；<br>
-      2. 可能是海外软件源临时抖动或 VPS 后台正在执行自动更新，稍等片刻点击【一键重新连接】重试。
-    `;
+    setDiagStatus(diagPort, 'bg-emerald-500', '正常连通', 'text-emerald-600');
+    setDiagStatus(diagAuth, 'bg-emerald-500', '认证通过', 'text-emerald-600');
+    setDiagAdvice(diagAdvice, [
+      '脚本执行被中断。若 VPS 之前已安装过部分组件，可直接点击下方的<strong>【快速取回已有节点】</strong>（免重新下载，约 1 秒提取）；',
+      '可能是海外软件源临时抖动或 VPS 后台正在执行自动更新，稍等片刻点击【一键重新连接】重试。',
+    ]);
   }
 }
 
