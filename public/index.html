@@ -193,13 +193,13 @@
 
       <form id="deploy-form" onsubmit="event.preventDefault(); handleDeploy();" class="space-y-4">
         <!-- VPS IP 与端口 -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div class="sm:col-span-2">
+        <div class="grid grid-cols-3 gap-3">
+          <div class="col-span-2">
             <label class="block text-xs font-semibold text-zinc-300 mb-1.5">VPS 公网 IP 地址 <span class="text-white font-bold">*</span></label>
             <input id="vps-host" type="text" required placeholder="例如：198.51.100.23" 
                    class="w-full px-3.5 py-2.5 bg-black/40 border border-zinc-700/60 rounded-xl text-sm text-zinc-100 placeholder-zinc-500 focus:bg-black/60 focus:border-white focus:ring-1 focus:ring-white outline-none transition">
           </div>
-          <div>
+          <div class="col-span-1">
             <label class="block text-xs font-semibold text-zinc-300 mb-1.5">SSH 端口</label>
             <input id="vps-port" type="number" value="22" required min="1" max="65535" 
                    class="w-full px-3.5 py-2.5 bg-black/40 border border-zinc-700/60 rounded-xl text-sm text-zinc-100 placeholder-zinc-500 focus:bg-black/60 focus:border-white focus:ring-1 focus:ring-white outline-none transition">
