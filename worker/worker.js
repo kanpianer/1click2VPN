@@ -10,17 +10,11 @@
 
 import { connect } from 'cloudflare:sockets';
 
-// [FIX #2] 端口白名单：默认只允许常见 SSH 端口，防止被用于任意端口扫描
-// 常见 VPS SSH 端口：标准 22、部分面板/系统使用 80/443/2222/8022/8080/8443
-// 可通过环境变量 ALLOWED_PORTS 自定义（逗号分隔）
-const DEFAULT_ALLOWED_PORTS = new Set([22, 80, 443, 2222, 8022, 8080, 8443]);
-
-// [FIX #4] 简单内存速率限制（基于当前 isolate 生命周期，非持久化）
-// 注意：Cloudflare Worker isolate 是短生命周期的，重启后计数归零。
-// 生产环境建议在 Cloudflare Dashboard → Security → WAF → Rate Limiting Rules 中
-// 配置持久化速率限制，以 CF-Connecting-IP 为键，每分钟最多 10 次连接。
+// 简单内存速率限制（基于当前 isolate 生命周期，防范高频端口探测与暴力扫描）
+// 正常的 SSH 客户端几分钟才发起 1 次连接；而恶意端口扫描需要 1 秒发起成百上千次。
+// 通过速率限制即可有效阻止恶意扫描滥用，同时完全不影响用户连接自定义 SSH 端口。
 const rateLimitMap = new Map(); // IP -> { count, resetAt }
-const RATE_LIMIT_MAX = 10;       // 每个 isolate 生命周期内最多允许 10 次连接
+const RATE_LIMIT_MAX = 15;       // 每个 IP 窗口内最多允许 15 次新建连接
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 分钟窗口
 
 function checkRateLimit(clientIp) {
@@ -162,16 +156,19 @@ export default {
 
       const cleanHost = targetHost.trim().replace(/^\[|\]$/g, '');
 
-      // [FIX #2] 端口白名单校验（支持环境变量覆盖）
-      const allowedPorts = env.ALLOWED_PORTS
-        ? new Set(env.ALLOWED_PORTS.split(',').map(p => parseInt(p.trim(), 10)).filter(p => !isNaN(p) && p > 0 && p <= 65535))
-        : DEFAULT_ALLOWED_PORTS;
-
-      if (!allowedPorts.has(targetPort)) {
-        return new Response(
-          `Forbidden: Port ${targetPort} is not allowed. Permitted SSH ports: ${[...allowedPorts].join(', ')}`,
-          { status: 403 }
+      // 支持 1-65535 任意自定义 SSH 端口；若管理员通过环境变量配置了 ALLOWED_PORTS 则按白名单校验
+      if (env.ALLOWED_PORTS) {
+        const allowedPorts = new Set(
+          env.ALLOWED_PORTS.split(',')
+            .map(p => parseInt(p.trim(), 10))
+            .filter(p => !isNaN(p) && p > 0 && p <= 65535)
         );
+        if (!allowedPorts.has(targetPort)) {
+          return new Response(
+            `Forbidden: Port ${targetPort} is not in the configured ALLOWED_PORTS whitelist`,
+            { status: 403 }
+          );
+        }
       }
 
       // 安全防线：防止内部 SSRF 探测

@@ -7,4 +7,4 @@ compatibility_flags = ["nodejs_compat"]
 ENVIRONMENT = "production"
 # 安全配置建议（生产环境可按需开启）：
 # ALLOWED_ORIGIN = "https://bxdt.sld.tw"  # 限制仅允许特定前端域名跨域调用中继，默认允许所有
-# ALLOWED_PORTS = "22,80,443,2222,8022,8080,8443"  # 允许中继连接的 VPS 目标端口白名单
+# ALLOWED_PORTS = "22,80,443,2222,8022,8080,8443"  # 可选：仅在需要严格限制目标端口时配置，默认放行 1-65535 任意合法 SSH 端口
