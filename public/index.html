@@ -178,7 +178,7 @@
         <!-- 右上角 脚本 图标与下拉菜单 -->
         <div class="relative shrink-0" id="script-menu-container">
           <button id="btn-script-menu" type="button" onclick="toggleScriptMenu(event)" 
-                  title="选择搭建脚本 (支持 Snell / 八合一 / Shlii 脚本)"
+                  title="选择搭建脚本 (支持 Snell / 八合一 / Shlii / 3X-UI 脚本)"
                   class="p-1.5 sm:p-2.5 rounded-xl text-white hover:bg-white/10 active:bg-white/20 transition-all flex items-center justify-center border border-white/15 hover:border-white/40 cursor-pointer shadow-sm group">
             <!-- 纯白脚本图标 (从 SVG 提取) -->
             <svg class="w-4 h-4 sm:w-5 sm:h-5 text-white transition-transform group-hover:scale-105" viewBox="0 0 64 64" fill="white" xmlns="http://www.w3.org/2000/svg">
@@ -190,59 +190,86 @@
           </button>
 
           <!-- 脚本选择下拉菜单 -->
-          <div id="script-dropdown" class="hidden absolute right-0 top-full mt-2 w-72 sm:w-80 bg-zinc-900/95 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl p-2 z-50 space-y-1 text-xs">
+          <div id="script-dropdown" class="hidden absolute right-0 top-full mt-2 w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[60dvh] overflow-y-auto bg-zinc-900/95 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl p-2 z-50 space-y-1 text-xs">
             <div class="px-2.5 py-1 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider flex items-center justify-between border-b border-white/10 pb-1.5 mb-1">
               <span>选择搭建脚本</span>
               <span class="text-[10px] text-zinc-500 font-normal">点击切换模式</span>
             </div>
 
             <!-- 默认：内置 VLESS-Reality -->
-            <button type="button" onclick="selectScript('builtin')" class="script-option w-full text-left p-2.5 rounded-xl hover:bg-white/10 transition-colors flex items-start space-x-3 group" data-script="builtin">
-              <span class="text-base mt-0.5">⚡</span>
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center justify-between">
-                  <span class="font-bold text-white group-hover:text-white">内置 VLESS-Reality</span>
-                  <span class="text-[10px] px-1.5 py-0.5 rounded bg-white text-black font-bold">全自动</span>
+            <div class="flex items-center gap-1">
+              <button type="button" onclick="selectScript('builtin')" class="script-option flex-1 min-w-0 text-left p-2.5 rounded-xl hover:bg-white/10 transition-colors flex items-start space-x-3 group" data-script="builtin">
+                <span class="text-base mt-0.5">⚡</span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between">
+                    <span class="font-bold text-white group-hover:text-white">内置 VLESS-Reality</span>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-white text-black font-bold">全自动</span>
+                  </div>
+                  <p class="text-[11px] text-zinc-400 mt-0.5">零知识端侧自动部署，直接生成二维码</p>
                 </div>
-                <p class="text-[11px] text-zinc-400 mt-0.5">零知识端侧自动部署，直接生成二维码</p>
-              </div>
-            </button>
+              </button>
+              <a href="https://github.com/www222fff/vpn2qr" target="_blank" rel="noopener noreferrer" aria-label="打开 内置 VLESS-Reality 的 GitHub 主页" class="shrink-0 px-2 py-2 rounded-lg text-[10px] text-zinc-300 hover:text-white hover:bg-white/10 border border-white/10">GitHub ↗</a>
+            </div>
 
             <!-- 脚本 1: Snell 一键脚本 -->
-            <button type="button" onclick="selectScript('snell')" class="script-option w-full text-left p-2.5 rounded-xl hover:bg-white/10 transition-colors flex items-start space-x-3 group" data-script="snell">
-              <span class="text-base mt-0.5">📜</span>
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center justify-between">
-                  <span class="font-bold text-zinc-200 group-hover:text-white">Snell 一键脚本</span>
-                  <span class="text-[10px] px-1.5 py-0.5 rounded bg-white/20 text-white font-medium">交互式</span>
+            <div class="flex items-center gap-1">
+              <button type="button" onclick="selectScript('snell')" class="script-option flex-1 min-w-0 text-left p-2.5 rounded-xl hover:bg-white/10 transition-colors flex items-start space-x-3 group" data-script="snell">
+                <span class="text-base mt-0.5">📜</span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between">
+                    <span class="font-bold text-zinc-200 group-hover:text-white">Snell 一键脚本</span>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-white/20 text-white font-medium">交互式</span>
+                  </div>
+                  <p class="text-[11px] text-zinc-400 mt-0.5 truncate font-mono">sh -c "$(curl -fsSL https://install.jinqians.com)"</p>
                 </div>
-                <p class="text-[11px] text-zinc-400 mt-0.5 truncate font-mono">sh -c "$(curl -fsSL https://install.jinqians.com)"</p>
-              </div>
-            </button>
+              </button>
+              <a href="https://github.com/jinqians/snell" target="_blank" rel="noopener noreferrer" aria-label="打开 Snell 的 GitHub 主页" class="shrink-0 px-2 py-2 rounded-lg text-[10px] text-zinc-300 hover:text-white hover:bg-white/10 border border-white/10">GitHub ↗</a>
+            </div>
 
             <!-- 脚本 2: 八合一一键脚本 -->
-            <button type="button" onclick="selectScript('v2ray-agent')" class="script-option w-full text-left p-2.5 rounded-xl hover:bg-white/10 transition-colors flex items-start space-x-3 group" data-script="v2ray-agent">
-              <span class="text-base mt-0.5">📦</span>
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center justify-between">
-                  <span class="font-bold text-zinc-200 group-hover:text-white">八合一一键脚本</span>
-                  <span class="text-[10px] px-1.5 py-0.5 rounded bg-white/20 text-white font-medium">交互式</span>
+            <div class="flex items-center gap-1">
+              <button type="button" onclick="selectScript('v2ray-agent')" class="script-option flex-1 min-w-0 text-left p-2.5 rounded-xl hover:bg-white/10 transition-colors flex items-start space-x-3 group" data-script="v2ray-agent">
+                <span class="text-base mt-0.5">📦</span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between">
+                    <span class="font-bold text-zinc-200 group-hover:text-white">八合一一键脚本</span>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-white/20 text-white font-medium">交互式</span>
+                  </div>
+                  <p class="text-[11px] text-zinc-400 mt-0.5 truncate font-mono">mack-a/v2ray-agent 强大聚合脚本</p>
                 </div>
-                <p class="text-[11px] text-zinc-400 mt-0.5 truncate font-mono">mack-a/v2ray-agent 强大聚合脚本</p>
-              </div>
-            </button>
+              </button>
+              <a href="https://github.com/mack-a/v2ray-agent" target="_blank" rel="noopener noreferrer" aria-label="打开 八合一 的 GitHub 主页" class="shrink-0 px-2 py-2 rounded-lg text-[10px] text-zinc-300 hover:text-white hover:bg-white/10 border border-white/10">GitHub ↗</a>
+            </div>
 
             <!-- 脚本 3: Shlii 官方脚本 -->
-            <button type="button" onclick="selectScript('shlii')" class="script-option w-full text-left p-2.5 rounded-xl hover:bg-white/10 transition-colors flex items-start space-x-3 group" data-script="shlii">
-              <span class="text-base mt-0.5">🚀</span>
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center justify-between">
-                  <span class="font-bold text-zinc-200 group-hover:text-white">Shlii 官方脚本</span>
-                  <span class="text-[10px] px-1.5 py-0.5 rounded bg-white/20 text-white font-medium">交互式</span>
+            <div class="flex items-center gap-1">
+              <button type="button" onclick="selectScript('shlii')" class="script-option flex-1 min-w-0 text-left p-2.5 rounded-xl hover:bg-white/10 transition-colors flex items-start space-x-3 group" data-script="shlii">
+                <span class="text-base mt-0.5">🚀</span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between">
+                    <span class="font-bold text-zinc-200 group-hover:text-white">Shlii 官方脚本</span>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-white/20 text-white font-medium">交互式</span>
+                  </div>
+                  <p class="text-[11px] text-zinc-400 mt-0.5 truncate font-mono">0xdabiaoge/singbox-lite 极简脚本</p>
                 </div>
-                <p class="text-[11px] text-zinc-400 mt-0.5 truncate font-mono">0xdabiaoge/singbox-lite 极简脚本</p>
-              </div>
-            </button>
+              </button>
+              <a href="https://github.com/0xdabiaoge/singbox-lite" target="_blank" rel="noopener noreferrer" aria-label="打开 Shlii 的 GitHub 主页" class="shrink-0 px-2 py-2 rounded-lg text-[10px] text-zinc-300 hover:text-white hover:bg-white/10 border border-white/10">GitHub ↗</a>
+            </div>
+
+            <!-- 脚本 4: 3X-UI 面板 -->
+            <div class="flex items-center gap-1">
+              <button type="button" onclick="selectScript('3x-ui')" class="script-option flex-1 min-w-0 text-left p-2.5 rounded-xl hover:bg-white/10 transition-colors flex items-start space-x-3 group" data-script="3x-ui">
+                <span class="text-base mt-0.5">🖥️</span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between">
+                    <span class="font-bold text-zinc-200 group-hover:text-white">3X-UI 一键脚本</span>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-white/20 text-white font-medium">交互式</span>
+                  </div>
+                  <p class="text-[11px] text-zinc-400 mt-0.5 truncate font-mono">mhsanaei/3x-ui 多协议管理面板</p>
+                </div>
+              </button>
+              <a href="https://github.com/mhsanaei/3x-ui" target="_blank" rel="noopener noreferrer" aria-label="打开 3X-UI 的 GitHub 主页" class="shrink-0 px-2 py-2 rounded-lg text-[10px] text-zinc-300 hover:text-white hover:bg-white/10 border border-white/10">GitHub ↗</a>
+            </div>
           </div>
         </div>
       </div>

@@ -36,6 +36,13 @@ const SCRIPT_DEFS = {
     btnText: '配置并搭建节点',
     interactive: true,
     cmd: '(curl -LfsS https://raw.githubusercontent.com/0xdabiaoge/singbox-lite/main/singbox.sh -o /usr/local/bin/sb || wget -q https://raw.githubusercontent.com/0xdabiaoge/singbox-lite/main/singbox.sh -O /usr/local/bin/sb) && chmod +x /usr/local/bin/sb && sb'
+  },
+  '3x-ui': {
+    name: '3X-UI 一键脚本',
+    badge: '已选: 3X-UI 脚本',
+    btnText: '安装并配置 3X-UI 面板',
+    interactive: true,
+    cmd: 'bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)'
   }
 };
 let currentScriptKey = 'builtin';

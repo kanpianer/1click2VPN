@@ -19,12 +19,36 @@ window.addEventListener('DOMContentLoaded', async () => {
   const check = (ok, name) => { results.push(`${ok ? 'PASS' : 'FAIL'}: ${name}`); };
   const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
   try {
+    const repos = {
+      builtin: 'www222fff/vpn2qr', snell: 'jinqians/snell',
+      'v2ray-agent': 'mack-a/v2ray-agent', shlii: '0xdabiaoge/singbox-lite',
+      '3x-ui': 'mhsanaei/3x-ui'
+    };
+    const options = [...document.querySelectorAll('.script-option')];
+    check(options.length === Object.keys(SCRIPT_DEFS).length && options.length === 5, 'every configured script has a menu entry');
+    for (const option of options) {
+      const key = option.dataset.script;
+      const link = option.parentElement.querySelector('a');
+      check(link && !option.contains(link) && link.href === 'https://github.com/' + repos[key] && link.target === '_blank' && link.relList.contains('noopener') && link.relList.contains('noreferrer'), key + ' has independent safe GitHub link');
+      if (link) {
+        link.addEventListener('click', e => e.preventDefault(), {once:true});
+        const before = currentScriptKey;
+        document.getElementById('script-dropdown').classList.remove('hidden');
+        link.click();
+        check(currentScriptKey === before && !document.getElementById('script-dropdown').classList.contains('hidden'), key + ' GitHub click does not change script or close menu');
+      }
+      option.click();
+      check(currentScriptKey === key && option.classList.contains('bg-white/15') && document.getElementById('script-dropdown').classList.contains('hidden'), key + ' selection updates mode and highlight');
+    }
+    check(document.getElementById('active-script-badge').textContent.includes('3X-UI') && document.getElementById('btn-submit-text').textContent.includes('3X-UI'), '3X-UI selection updates badge and submit label');
     validateInputs = () => true;
     document.getElementById('vps-host').value = '192.0.2.1';
     document.getElementById('vps-password').value = 'fixture';
     let callbacks;
-    window.vpn2qrInteractiveSession = (_, cb) => { callbacks = cb; return { close() {}, send() {} }; };
-    await executeInteractiveTerminal('snell');
+    let sessionOptions;
+    window.vpn2qrInteractiveSession = (opts, cb) => { sessionOptions = opts; callbacks = cb; return { close() {}, send() {} }; };
+    await executeInteractiveTerminal('3x-ui');
+    check(SCRIPT_DEFS['3x-ui'].interactive && sessionOptions.cmd === 'bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)', '3X-UI passes exact requested command to interactive SSH session');
     await pause(150);
     activeXterm.reset();
     const sample = 'vless://fixture@example.test:443?security=reality#测试';
