@@ -44,6 +44,7 @@ let currentScriptKey = 'builtin';
 let activeTerminalSession = null;
 let activeXterm = null;
 let activeFitAddon = null;
+let disposeTerminalCopyGesture = null;
 
 // 切换脚本下拉菜单
 function toggleScriptMenu(e) {
@@ -680,6 +681,7 @@ async function executeInteractiveTerminal(scriptKey) {
   }
 
   // 清理现有会话与终端
+  cleanupTerminalCopy();
   if (activeTerminalSession) {
     try { activeTerminalSession.close(); } catch (e) {}
     activeTerminalSession = null;
@@ -739,6 +741,7 @@ async function executeInteractiveTerminal(scriptKey) {
 
   activeXterm = term;
   activeFitAddon = fitAddon;
+  disposeTerminalCopyGesture = installTerminalCopyGesture(container);
 
   term.writeln('\x1b[37;1m==> 正在建立端到端加密 WebSocket 盲中继通道...\x1b[0m');
   term.writeln(`\x1b[90m目标节点: ${host}:${port} | 预执行指令: ${def.cmd}\x1b[0m\r\n`);
@@ -811,6 +814,74 @@ function handleTerminalWindowResize() {
   }
 }
 
+// xterm 的绘制层无法供手机原生选词：长按打开只读文本快照，而非拦截滚动或直接写剪贴板。
+function installTerminalCopyGesture(container) {
+  let timer = null;
+  let startX = 0;
+  let startY = 0;
+  const cancel = () => {
+    clearTimeout(timer);
+    timer = null;
+  };
+  const start = (event) => {
+    cancel();
+    if (event.touches.length !== 1) return;
+    startX = event.touches[0].clientX;
+    startY = event.touches[0].clientY;
+    timer = setTimeout(() => {
+      timer = null;
+      openTerminalCopy();
+    }, 550);
+  };
+  const move = (event) => {
+    if (event.touches.length !== 1 || Math.hypot(event.touches[0].clientX - startX, event.touches[0].clientY - startY) > 10) cancel();
+  };
+  // 捕获阶段监听，避免被 xterm 内部的触摸处理截断；不 preventDefault，保留短按和滑动。
+  const options = { capture: true, passive: true };
+  const handlers = { touchstart: start, touchmove: move, touchend: cancel, touchcancel: cancel };
+  for (const [type, handler] of Object.entries(handlers)) container.addEventListener(type, handler, options);
+  return () => {
+    cancel();
+    for (const [type, handler] of Object.entries(handlers)) container.removeEventListener(type, handler, options);
+  };
+}
+
+function openTerminalCopy() {
+  const dialog = document.getElementById('terminal-copy-dialog');
+  const text = document.getElementById('terminal-copy-text');
+  if (!activeXterm || !dialog || !text || dialog.open) return;
+  const buffer = activeXterm.buffer.active;
+  const lines = [];
+  for (let i = 0; i < buffer.length; i++) {
+    const line = buffer.getLine(i);
+    if (!line) continue;
+    // 仅裁掉逻辑行末的空白，保留软换行边界的空格，并拼回长链接。
+    const continued = buffer.getLine(i + 1)?.isWrapped;
+    const content = line.translateToString(!continued);
+    if (line.isWrapped && lines.length) lines[lines.length - 1] += content;
+    else lines.push(content);
+  }
+  text.value = lines.join('\n').replace(/\n+$/, '');
+  activeXterm.blur();
+  dialog.showModal();
+  // 只读输入框支持 iOS/Android 原生选词与复制，不会将复制动作发往 SSH。
+  text.focus({ preventScroll: true });
+  text.setSelectionRange(0, 0);
+}
+
+function closeTerminalCopy() {
+  const dialog = document.getElementById('terminal-copy-dialog');
+  if (dialog?.open) dialog.close();
+  const text = document.getElementById('terminal-copy-text');
+  if (text) text.value = '';
+}
+
+function cleanupTerminalCopy() {
+  disposeTerminalCopyGesture?.();
+  disposeTerminalCopyGesture = null;
+  closeTerminalCopy();
+}
+
 // 终端辅助按键输入
 function terminalSendInput(data) {
   if (activeTerminalSession && typeof activeTerminalSession.send === 'function') {
@@ -831,6 +902,7 @@ function clearInteractiveTerminal() {
 
 // 关闭交互终端返回表单
 function closeInteractiveTerminal() {
+  cleanupTerminalCopy();
   window.removeEventListener('resize', handleTerminalWindowResize);
   if (activeTerminalSession) {
     try { activeTerminalSession.close(); } catch (e) {}
